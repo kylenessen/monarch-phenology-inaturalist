@@ -55,6 +55,10 @@ htmlcov/
 # *.rds
 # *.feather
 
+# GBIF Taxa Analysis outputs
+output/
+*_analysis/
+
 # OS
 .DS_Store
 Thumbs.db

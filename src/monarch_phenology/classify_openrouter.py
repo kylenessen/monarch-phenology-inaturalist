@@ -28,6 +28,71 @@ class WorkItem:
     attempt_count: int
 
 
+def _strip_code_fences(text: str) -> str:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        parts = stripped.split("\n")
+        if len(parts) >= 2 and parts[0].startswith("```"):
+            stripped = "\n".join(parts[1:])
+        if stripped.rstrip().endswith("```"):
+            stripped = stripped.rstrip()
+            stripped = stripped[: -len("```")].rstrip()
+    return stripped.strip()
+
+
+def _extract_first_json_object(text: str) -> str:
+    text = _strip_code_fences(text)
+    start = text.find("{")
+    if start == -1:
+        raise JSONDecodeError("no '{' found", text, 0)
+
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        ch = text[i]
+        if in_string:
+            if escape:
+                escape = False
+            elif ch == "\\":
+                escape = True
+            elif ch == '"':
+                in_string = False
+            continue
+
+        if ch == '"':
+            in_string = True
+            continue
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start : i + 1]
+
+    raise JSONDecodeError("unterminated object", text, start)
+
+
+def _parse_model_json(content: Any) -> dict[str, Any]:
+    if isinstance(content, dict):
+        return content
+    if not isinstance(content, str):
+        raise TypeError(f"unexpected content type: {type(content).__name__}")
+
+    try:
+        parsed = json.loads(content)
+        if isinstance(parsed, dict):
+            return parsed
+    except JSONDecodeError:
+        pass
+
+    candidate = _extract_first_json_object(content)
+    parsed2 = json.loads(candidate)
+    if not isinstance(parsed2, dict):
+        raise JSONDecodeError("not a JSON object", candidate, 0)
+    return parsed2
+
+
 def _select_next_work(
     *,
     conn,
@@ -154,6 +219,7 @@ def _mark_failed(
     error: str,
     retry_after_seconds: int,
     max_attempts: int,
+    raw_response: dict[str, Any] | None = None,
 ) -> None:
     retry_after = utcnow() + timedelta(seconds=retry_after_seconds)
     conn.execute(
@@ -164,10 +230,21 @@ def _mark_failed(
             last_attempt_at = now(),
             attempt_count = attempt_count + 1,
             retry_after = CASE WHEN attempt_count + 1 >= %s THEN NULL ELSE %s END,
+            raw_response = COALESCE(%s::jsonb, raw_response),
             error = %s
         WHERE photo_id = %s AND model_provider = %s AND model = %s AND prompt_version = %s
         """,
-        (max_attempts, max_attempts, retry_after, error, item.photo_id, model_provider, model, prompt_version),
+        (
+            max_attempts,
+            max_attempts,
+            retry_after,
+            None if raw_response is None else json.dumps(raw_response),
+            error,
+            item.photo_id,
+            model_provider,
+            model,
+            prompt_version,
+        ),
     )
 
 
@@ -179,6 +256,7 @@ def _mark_permanent_failed(
     model: str,
     prompt_version: str,
     error: str,
+    raw_response: dict[str, Any] | None = None,
 ) -> None:
     conn.execute(
         """
@@ -188,10 +266,18 @@ def _mark_permanent_failed(
             last_attempt_at = now(),
             attempt_count = attempt_count + 1,
             retry_after = NULL,
+            raw_response = COALESCE(%s::jsonb, raw_response),
             error = %s
         WHERE photo_id = %s AND model_provider = %s AND model = %s AND prompt_version = %s
         """,
-        (error, item.photo_id, model_provider, model, prompt_version),
+        (
+            None if raw_response is None else json.dumps(raw_response),
+            error,
+            item.photo_id,
+            model_provider,
+            model,
+            prompt_version,
+        ),
     )
 
 
@@ -286,10 +372,11 @@ def classify_openrouter(
             futures = {ex.submit(_worker, item, notes): (item, notes) for (item, notes, _tr) in prepared}
             for fut in as_completed(futures):
                 item, notes = futures[fut]
+                raw: dict[str, Any] | None = None
                 try:
                     raw = fut.result()
                     content = raw["choices"][0]["message"]["content"]
-                    output = json.loads(content) if isinstance(content, str) else content
+                    output = _parse_model_json(content)
                     _mark_success(
                         conn=conn,
                         item=item,
@@ -312,6 +399,7 @@ def classify_openrouter(
                             model=model,
                             prompt_version=prompt_version,
                             error=msg,
+                            raw_response=raw,
                         )
                     else:
                         _mark_failed(
@@ -323,6 +411,7 @@ def classify_openrouter(
                             error=msg,
                             retry_after_seconds=retry_seconds,
                             max_attempts=max_attempts,
+                            raw_response=raw,
                         )
                     failed += 1
                     logger.warning("classification failed photo_id=%s attempt=%s: %s", item.photo_id, attempt, msg)

@@ -10,6 +10,10 @@ This project aims to:
 - Maintain a continuously updated phenological dataset
 - Enable research on monarch migration patterns, timing, and behavior
 
+## Project Notes / Architecture
+
+See `docs/ARCHITECTURE.md` for the current plan, data sources, pipeline, database approach, and licensing notes.
+
 ## Status
 
 Early development. Project structure and data pipeline under construction.

@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
 import httpx
+
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -36,8 +40,17 @@ class InatObservation:
 
 
 class InatClient:
-    def __init__(self, *, sleep_seconds: float = 0.5, timeout_seconds: float = 30.0):
+    def __init__(
+        self,
+        *,
+        sleep_seconds: float = 0.5,
+        timeout_seconds: float = 30.0,
+        max_retries: int = 5,
+        retry_backoff_seconds: float = 2.0,
+    ):
         self._sleep_seconds = sleep_seconds
+        self._max_retries = max_retries
+        self._retry_backoff_seconds = retry_backoff_seconds
         self._client = httpx.Client(
             base_url="https://api.inaturalist.org/v1",
             timeout=httpx.Timeout(timeout_seconds),
@@ -71,11 +84,39 @@ class InatClient:
         if updated_since:
             params["updated_since"] = updated_since
 
-        resp = self._client.get("/observations", params=params)
-        resp.raise_for_status()
-        data = resp.json()
-        time.sleep(self._sleep_seconds)
-        return data
+        attempt = 0
+        while True:
+            try:
+                resp = self._client.get("/observations", params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                time.sleep(self._sleep_seconds)
+                return data
+            except httpx.HTTPStatusError as e:
+                status = e.response.status_code
+                retry_after = e.response.headers.get("Retry-After")
+                attempt += 1
+                if attempt > self._max_retries:
+                    raise
+
+                if status == 429:
+                    sleep_for = float(retry_after) if retry_after and retry_after.isdigit() else self._retry_backoff_seconds * attempt
+                    logger.warning("iNat rate limited (429); sleeping %.1fs", sleep_for)
+                    time.sleep(sleep_for)
+                    continue
+                if 500 <= status < 600:
+                    sleep_for = self._retry_backoff_seconds * attempt
+                    logger.warning("iNat server error %s; sleeping %.1fs", status, sleep_for)
+                    time.sleep(sleep_for)
+                    continue
+                raise
+            except (httpx.TimeoutException, httpx.RequestError):
+                attempt += 1
+                if attempt > self._max_retries:
+                    raise
+                sleep_for = self._retry_backoff_seconds * attempt
+                logger.warning("iNat request error; sleeping %.1fs", sleep_for)
+                time.sleep(sleep_for)
 
 
 def best_photo_urls(photo: dict[str, Any]) -> tuple[str | None, str | None, str | None]:
@@ -94,4 +135,3 @@ def best_photo_urls(photo: dict[str, Any]) -> tuple[str | None, str | None, str 
             original = original_guess
 
     return square, large, original
-

@@ -11,6 +11,7 @@ COPY pyproject.toml uv.lock* ./
 RUN if [ -f uv.lock ]; then uv sync --frozen --no-dev --no-install-project; else uv sync --no-dev --no-install-project; fi
 
 COPY src ./src
+COPY prompts ./prompts
 
 RUN if [ -f uv.lock ]; then uv sync --frozen --no-dev; else uv sync --no-dev; fi
 

@@ -1,29 +1,22 @@
 from __future__ import annotations
 
+import logging
 import json
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import timedelta
+from json import JSONDecodeError
 from typing import Any
+
+import httpx
 
 from .db import ensure_schema, utcnow
 from .openrouter_client import OpenRouterClient, OpenRouterConfig, prompt_hash
+from .prompts import load_prompt
 
 
-DEFAULT_PROMPT = """You are labeling monarch butterfly photos for a research dataset.
-
-Return ONLY valid JSON.
-
-Labels:
-- life_stage: one of ["egg","larva","pupa","adult","unknown"]
-- adult_behaviors: array of zero or more of ["nectaring","mating","clustering","ovipositing","flying"]
-- larva_stage: one of ["early","late","unknown"] (only if life_stage is larva, else "unknown")
-
-Rules:
-- If you cannot tell from the photo, use "unknown".
-- Use observer notes only as supporting context; prefer what is visible in the image.
-"""
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -32,6 +25,7 @@ class WorkItem:
     observation_id: int
     image_url: str
     notes: str
+    attempt_count: int
 
 
 def _select_next_work(
@@ -48,7 +42,8 @@ def _select_next_work(
           p.photo_id,
           p.observation_id,
           COALESCE(p.url_large, p.url_square, p.url_original) AS image_url,
-          o.description AS notes
+          o.description AS notes,
+          COALESCE(c.attempt_count, 0) AS attempt_count
         FROM photos p
         JOIN observations o ON o.observation_id = p.observation_id
         LEFT JOIN classifications c
@@ -75,6 +70,7 @@ def _select_next_work(
                 observation_id=int(r["observation_id"]),
                 image_url=str(r["image_url"]),
                 notes=str(r["notes"] or ""),
+                attempt_count=int(r["attempt_count"] or 0),
             )
         )
     return items
@@ -157,21 +153,77 @@ def _mark_failed(
     prompt_version: str,
     error: str,
     retry_after_seconds: int,
+    max_attempts: int,
 ) -> None:
     retry_after = utcnow() + timedelta(seconds=retry_after_seconds)
     conn.execute(
         """
         UPDATE classifications
-        SET status = 'failed',
+        SET status = CASE WHEN attempt_count + 1 >= %s THEN 'permanent_failed' ELSE 'failed' END,
             updated_at = now(),
             last_attempt_at = now(),
             attempt_count = attempt_count + 1,
-            retry_after = %s,
+            retry_after = CASE WHEN attempt_count + 1 >= %s THEN NULL ELSE %s END,
             error = %s
         WHERE photo_id = %s AND model_provider = %s AND model = %s AND prompt_version = %s
         """,
-        (retry_after, error, item.photo_id, model_provider, model, prompt_version),
+        (max_attempts, max_attempts, retry_after, error, item.photo_id, model_provider, model, prompt_version),
     )
+
+
+def _mark_permanent_failed(
+    *,
+    conn,
+    item: WorkItem,
+    model_provider: str,
+    model: str,
+    prompt_version: str,
+    error: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE classifications
+        SET status = 'permanent_failed',
+            updated_at = now(),
+            last_attempt_at = now(),
+            attempt_count = attempt_count + 1,
+            retry_after = NULL,
+            error = %s
+        WHERE photo_id = %s AND model_provider = %s AND model = %s AND prompt_version = %s
+        """,
+        (error, item.photo_id, model_provider, model, prompt_version),
+    )
+
+
+def _retry_seconds_for_attempt(attempt: int, base: int, cap: int) -> int:
+    # attempt is 1-based
+    return min(cap, base * (2 ** max(0, attempt - 1)))
+
+
+def _classify_retry_policy(error: Exception, *, attempt: int) -> tuple[bool, int, str]:
+    """
+    Returns (permanent, retry_after_seconds, message).
+    """
+    if isinstance(error, httpx.HTTPStatusError):
+        status = error.response.status_code
+        if status == 429:
+            retry_after = error.response.headers.get("Retry-After")
+            if retry_after and retry_after.isdigit():
+                return False, int(retry_after), f"http {status} rate limited"
+            return False, _retry_seconds_for_attempt(attempt, base=10, cap=300), f"http {status} rate limited"
+        if 500 <= status < 600:
+            return False, _retry_seconds_for_attempt(attempt, base=30, cap=1800), f"http {status} server error"
+        # Most 4xx errors are permanent for the current model/prompt/input.
+        return True, 0, f"http {status} client error"
+
+    if isinstance(error, (httpx.TimeoutException, httpx.RequestError)):
+        return False, _retry_seconds_for_attempt(attempt, base=10, cap=600), "network error"
+
+    if isinstance(error, JSONDecodeError):
+        # Usually means the model didn't return valid JSON. Retry a couple times, then stop.
+        return False, _retry_seconds_for_attempt(attempt, base=60, cap=1800), "invalid JSON response"
+
+    return False, _retry_seconds_for_attempt(attempt, base=60, cap=3600), "unexpected error"
 
 
 def classify_openrouter(
@@ -180,15 +232,19 @@ def classify_openrouter(
     api_key: str,
     model: str,
     prompt_version: str,
+    prompt_path: str,
     notes_max_chars: int,
     max_workers: int,
+    max_attempts: int,
     max_items: int,
     sleep_seconds: float = 0.0,
 ) -> dict[str, int]:
     ensure_schema(conn)
 
+    # Note: only the main thread writes to the database connection. Worker threads
+    # only call the OpenRouter API and return results to the main thread.
     model_provider = "openrouter"
-    prompt = DEFAULT_PROMPT
+    prompt = load_prompt(prompt_path)
     p_hash = prompt_hash(prompt)
 
     try:
@@ -244,17 +300,32 @@ def classify_openrouter(
                         raw_response=raw,
                     )
                     succeeded += 1
-                except Exception as e:  # noqa: BLE001
-                    _mark_failed(
-                        conn=conn,
-                        item=item,
-                        model_provider=model_provider,
-                        model=model,
-                        prompt_version=prompt_version,
-                        error=str(e),
-                        retry_after_seconds=3600,
-                    )
+                except Exception as e:
+                    attempt = item.attempt_count + 1
+                    permanent, retry_seconds, reason = _classify_retry_policy(e, attempt=attempt)
+                    msg = f"{reason}: {e}"
+                    if permanent or attempt >= max_attempts:
+                        _mark_permanent_failed(
+                            conn=conn,
+                            item=item,
+                            model_provider=model_provider,
+                            model=model,
+                            prompt_version=prompt_version,
+                            error=msg,
+                        )
+                    else:
+                        _mark_failed(
+                            conn=conn,
+                            item=item,
+                            model_provider=model_provider,
+                            model=model,
+                            prompt_version=prompt_version,
+                            error=msg,
+                            retry_after_seconds=retry_seconds,
+                            max_attempts=max_attempts,
+                        )
                     failed += 1
+                    logger.warning("classification failed photo_id=%s attempt=%s: %s", item.photo_id, attempt, msg)
 
                 conn.commit()
                 if sleep_seconds:

@@ -93,6 +93,8 @@ def ingest_inat(
     overlap_hours: int,
     sleep_seconds: float,
     max_pages_per_run: int,
+    max_retries: int,
+    retry_backoff_seconds: float,
 ) -> dict[str, int]:
     ensure_schema(conn)
 
@@ -103,7 +105,11 @@ def ingest_inat(
 
     updated_since = _iso(last_dt - timedelta(hours=overlap_hours))
 
-    client = InatClient(sleep_seconds=sleep_seconds)
+    client = InatClient(
+        sleep_seconds=sleep_seconds,
+        max_retries=max_retries,
+        retry_backoff_seconds=retry_backoff_seconds,
+    )
     try:
         page = 1
         max_updated_at: datetime | None = None
@@ -138,14 +144,18 @@ def ingest_inat(
                       quality_grade, captive, license_code,
                       observed_at, observed_on, created_at, updated_at,
                       latitude, longitude, positional_accuracy, place_guess,
-                      user_id, user_login, description, raw
+                      user_id, user_login, description,
+                      first_seen_at, last_seen_at,
+                      raw
                     )
                     VALUES (
                       %(observation_id)s, %(inat_url)s, %(taxon_id)s, %(taxon_name)s, %(taxon_preferred_common_name)s,
                       %(quality_grade)s, %(captive)s, %(license_code)s,
                       %(observed_at)s, %(observed_on)s, %(created_at)s, %(updated_at)s,
                       %(latitude)s, %(longitude)s, %(positional_accuracy)s, %(place_guess)s,
-                      %(user_id)s, %(user_login)s, %(description)s, %(raw)s::jsonb
+                      %(user_id)s, %(user_login)s, %(description)s,
+                      now(), now(),
+                      %(raw)s::jsonb
                     )
                     ON CONFLICT (observation_id) DO UPDATE SET
                       inat_url = EXCLUDED.inat_url,
@@ -166,6 +176,7 @@ def ingest_inat(
                       user_id = EXCLUDED.user_id,
                       user_login = EXCLUDED.user_login,
                       description = EXCLUDED.description,
+                      last_seen_at = now(),
                       raw = EXCLUDED.raw
                     """,
                     fields,
@@ -180,12 +191,16 @@ def ingest_inat(
                         INSERT INTO photos (
                           photo_id, observation_id, position,
                           url_square, url_large, url_original,
-                          license_code, attribution, raw
+                          license_code, attribution,
+                          first_seen_at, last_seen_at,
+                          raw
                         )
                         VALUES (
                           %(photo_id)s, %(observation_id)s, %(position)s,
                           %(url_square)s, %(url_large)s, %(url_original)s,
-                          %(license_code)s, %(attribution)s, %(raw)s::jsonb
+                          %(license_code)s, %(attribution)s,
+                          now(), now(),
+                          %(raw)s::jsonb
                         )
                         ON CONFLICT (photo_id) DO UPDATE SET
                           observation_id = EXCLUDED.observation_id,
@@ -195,6 +210,7 @@ def ingest_inat(
                           url_original = EXCLUDED.url_original,
                           license_code = EXCLUDED.license_code,
                           attribution = EXCLUDED.attribution,
+                          last_seen_at = now(),
                           raw = EXCLUDED.raw
                         """,
                         pfields,
@@ -213,4 +229,3 @@ def ingest_inat(
         return {"observations": obs_count, "photos": photo_count}
     finally:
         client.close()
-

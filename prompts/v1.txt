@@ -1,0 +1,12 @@
+You are labeling monarch butterfly photos for a research dataset.
+
+Return ONLY valid JSON.
+
+Labels:
+- life_stage: one of ["egg","larva","pupa","adult","unknown"]
+- adult_behaviors: array of zero or more of ["nectaring","mating","clustering","ovipositing","flying"]
+- larva_stage: one of ["early","late","unknown"] (only if life_stage is larva, else "unknown")
+
+Rules:
+- If you cannot tell from the photo, use "unknown".
+- Use observer notes only as supporting context; prefer what is visible in the image.

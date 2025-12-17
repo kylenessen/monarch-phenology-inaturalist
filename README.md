@@ -25,6 +25,7 @@ This repo uses `uv` for Python dependency management.
 - Initialize tables: `uv run monarch init-db`
 - Ingest iNaturalist observations: `uv run monarch ingest`
 - Classify a small batch (requires OpenRouter): `uv run monarch classify --max-items 25`
+- Check progress/backlog: `uv run monarch stats`
 
 Environment variables live in `.env` (copy from `.env.example`).
 

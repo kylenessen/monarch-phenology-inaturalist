@@ -31,10 +31,15 @@ SCHEMA_STATEMENTS: list[str] = [
       user_id BIGINT,
       user_login TEXT,
       description TEXT,
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       raw JSONB NOT NULL
     );
     """,
+    "ALTER TABLE observations ADD COLUMN IF NOT EXISTS first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now();",
+    "ALTER TABLE observations ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now();",
     "CREATE INDEX IF NOT EXISTS observations_updated_at_idx ON observations (updated_at);",
+    "CREATE INDEX IF NOT EXISTS observations_last_seen_at_idx ON observations (last_seen_at);",
     "CREATE INDEX IF NOT EXISTS observations_observed_on_idx ON observations (observed_on);",
     "CREATE INDEX IF NOT EXISTS observations_place_guess_idx ON observations (place_guess);",
     """
@@ -47,10 +52,15 @@ SCHEMA_STATEMENTS: list[str] = [
       url_original TEXT,
       license_code TEXT,
       attribution TEXT,
+      first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now(),
       raw JSONB NOT NULL
     );
     """,
+    "ALTER TABLE photos ADD COLUMN IF NOT EXISTS first_seen_at TIMESTAMPTZ NOT NULL DEFAULT now();",
+    "ALTER TABLE photos ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ NOT NULL DEFAULT now();",
     "CREATE INDEX IF NOT EXISTS photos_observation_id_idx ON photos (observation_id);",
+    "CREATE INDEX IF NOT EXISTS photos_last_seen_at_idx ON photos (last_seen_at);",
     """
     CREATE TABLE IF NOT EXISTS classifications (
       classification_id BIGSERIAL PRIMARY KEY,
@@ -137,4 +147,3 @@ def chunked(items: Iterable[Any], size: int) -> Iterable[list[Any]]:
             batch = []
     if batch:
         yield batch
-

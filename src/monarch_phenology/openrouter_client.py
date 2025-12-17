@@ -53,9 +53,7 @@ class OpenRouterClient:
                     ],
                 },
             ],
-            "response_format": {"type": "json_object"},
         }
         resp = self._client.post("/chat/completions", content=json.dumps(payload))
         resp.raise_for_status()
         return resp.json()
-

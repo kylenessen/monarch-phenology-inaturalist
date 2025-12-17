@@ -1,0 +1,37 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: monarch
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  app:
+    build: .
+    depends_on:
+      - db
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://postgres:postgres@db:5432/monarch}
+      INAT_TAXON_ID: ${INAT_TAXON_ID:-48662}
+      INAT_PLACE_ID: ${INAT_PLACE_ID:-62068}
+      INAT_QUALITY_GRADE: ${INAT_QUALITY_GRADE:-research}
+      INAT_PER_PAGE: ${INAT_PER_PAGE:-200}
+      INAT_BACKFILL_DAYS: ${INAT_BACKFILL_DAYS:-7}
+      INAT_OVERLAP_HOURS: ${INAT_OVERLAP_HOURS:-24}
+      INAT_SLEEP_SECONDS: ${INAT_SLEEP_SECONDS:-0.5}
+      INAT_MAX_PAGES_PER_RUN: ${INAT_MAX_PAGES_PER_RUN:-0}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
+      OPENROUTER_MODEL: ${OPENROUTER_MODEL:-}
+      PROMPT_VERSION: ${PROMPT_VERSION:-v1}
+      CLASSIFY_MAX_WORKERS: ${CLASSIFY_MAX_WORKERS:-2}
+      CLASSIFY_NOTES_MAX_CHARS: ${CLASSIFY_NOTES_MAX_CHARS:-2000}
+      RUN_INGEST_EVERY_SECONDS: ${RUN_INGEST_EVERY_SECONDS:-86400}
+      RUN_CLASSIFY_EVERY_SECONDS: ${RUN_CLASSIFY_EVERY_SECONDS:-10}
+    command: ["uv", "run", "monarch", "run"]
+
+volumes:
+  pgdata:

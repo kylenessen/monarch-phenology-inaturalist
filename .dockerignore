@@ -1,0 +1,15 @@
+.DS_Store
+.git
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+.ruff_cache
+dist
+build
+htmlcov
+.mypy_cache
+.idea
+.vscode

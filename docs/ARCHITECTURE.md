@@ -60,6 +60,18 @@ Think of this as two loops running in the background:
 
 Key idea: ingestion is lightweight; classification is the bottleneck and we throttle it on purpose.
 
+### What we send to the AI (v1)
+
+For each photo, the AI should see:
+- the image
+- the observation text / notes (if present)
+
+A simple prompt pattern is:
+- “Observer notes: …” followed by the user-provided description (or blank if none)
+
+Practical safety note:
+- Observation notes can be very long or contain sensitive info. In v1, we can **truncate** what we send to the model (for example, first 2,000 characters) and avoid sending obvious personal details (emails/phone numbers) if they appear. We can still store the full original text in the database.
+
 ## 5) Running “in the background” (Docker)
 
 Target setup:
@@ -87,13 +99,21 @@ Suggested tables (high level):
 
 - `observations`
   - `observation_id` (unique)
-  - core metadata (dates, place, coordinates, etc.)
+  - **core metadata we care about explicitly**:
+    - observation time/date (when it was observed)
+    - latitude / longitude (and any accuracy/uncertainty fields)
+    - place info (for filtering/summary)
+    - observer info (username / user id)
+    - notes/description text
+    - iNaturalist “research grade” / quality flags
+    - life stage annotation (when iNaturalist provides it)
   - raw JSON blob from the API (so we don’t lose fields)
 
 - `photos`
   - `photo_id` (unique)
   - `observation_id` (links back)
-  - photo URLs + license info + attribution
+  - photo URLs
+  - license info + attribution (still store this, even if we don’t filter on it in v1)
   - optional: a local file path / checksum if we download/cache images
 
 - `classifications`
@@ -104,6 +124,27 @@ Suggested tables (high level):
 
 Important rule:
 - Don’t create duplicates. If the same `observation_id` or `photo_id` shows up again, update the existing row instead of inserting a second copy.
+
+### Classification history (don’t overwrite)
+
+When we improve the prompt or change models, we should **not overwrite** old results.
+
+Simple rule:
+- each time we classify a photo, we create a **new** row in `classifications` with:
+  - `photo_id`
+  - `model` (name/version/provider)
+  - `prompt_version`
+  - `created_at`
+
+Then we can:
+- query “latest classification per photo” for day-to-day analysis
+- keep older results for comparison and reproducibility
+
+### Duplicate observations (same butterfly, different people)
+
+In v1, we will **not try to deduplicate** across different iNaturalist observations, even if they might be the same butterfly in the same place/time. We will classify what iNaturalist gives us.
+
+Later, if we want, we can add analysis to group observations by location/time to study clustering or reduce repeated individuals.
 
 ## 7) Tracking “how the AI result was produced” (important for later)
 
@@ -123,13 +164,15 @@ This lets us:
 
 Goal: publish/share results widely without creating avoidable licensing problems.
 
-Two-mode approach:
+Two-mode approach (important difference between “what we store” and “what we publish”):
 
-- **Safe mode (recommended default when using cloud models)**
-  Only send photos to the cloud model if the photo license clearly allows reuse (for example CC licenses that permit redistribution). Store everything else in the database, but skip cloud classification for restricted photos.
+- **Build mode (v1 default)**
+  Don’t filter by photo license when ingesting or classifying (this keeps the dataset much larger). Still store license/attribution fields.
 
-- **Everything mode (for private/internal analysis)**
-  You can ingest everything, but you should assume you can’t republish the images, and you may decide not to send restricted images to third-party APIs.
+- **Publish mode (when sharing data)**
+  When we publish, we can export a “safe to share” dataset. For example:
+  - always okay: observation IDs/links + your derived labels + attribution fields
+  - only sometimes okay: republishing the actual images (depends on the license)
 
 What we can publish even in safe mode:
 - observation IDs/links
@@ -145,13 +188,94 @@ What we can publish even in safe mode:
 - Vision model: **cloud (OpenRouter)** first, because it’s fastest to iterate
 - Focus: get the end-to-end pipeline working on a small sample before scaling
 
-## 10) Open questions (to decide soon)
+## 9.1) Model choice, cost, and speed (v1 assumptions)
 
-- Geography: what counts as “North America” for filtering?
-- Data quality: include research-grade only, or include needs-ID/casual?
-- Update schedule: hourly vs daily sync?
-- Cloud policy: in v1, do we classify only clearly licensed photos, or attempt more?
-- Image caching: do we download and store images locally, or only store URLs?
+Current plan:
+- Use a **free (or very cheap) OpenRouter vision model** (example: a free Gemma model, or similar) to keep costs near zero.
+- Speed is not critical. It’s okay if building the dataset takes days/weeks/months.
+
+Even if speed isn’t critical, we still want to be polite and stable:
+- Add a **rate limit** (a configurable “max requests per minute”).
+- Add **small concurrency** (a few workers at most) and tune it after we confirm the API limits.
+- Add backoff/retries so temporary issues don’t break the service.
+
+If model quality is not good enough:
+- Improve the prompt and label definitions first.
+- Try a different model (still via OpenRouter).
+- Optionally move to a local model later (workstation) if we want more control.
+
+## 9.2) Quality and validation (v1 approach)
+
+We’ll keep validation lightweight at the start so we can get moving.
+
+What we can use as “pretty good ground truth”:
+- iNaturalist often has human-provided **life stage** annotations (egg/larva/pupa/adult). These are a strong reference for that one label category.
+
+What’s harder:
+- behaviors (nectaring/mating/clustering/ovipositing) usually won’t have clean ground truth.
+
+Practical v1 plan:
+- Start scraping + classifying and aim for the first ~**1,000 photos**.
+- Review a small sample by hand to see how the model is doing.
+- Later (separate effort), create a hand-labeled set for the trickier behaviors.
+
+## 9.3) Failure handling (v1 approach)
+
+Common things that will go wrong and how we’ll handle them:
+
+- **Temporary API problems** (timeouts, 5xx errors, rate limiting):
+  - retry a few times with increasing delays
+  - if we keep getting blocked, slow down automatically
+
+- **Model provider down**:
+  - mark the classification attempt as “failed for now”
+  - try again later (for example, after an hour)
+
+- **Missing/deleted/corrupt photos**:
+  - record that the photo couldn’t be downloaded
+  - don’t keep retrying forever (avoid a stuck queue)
+
+Important: store failures in the database so we know what happened and can re-try later.
+
+## 9.4) Basic monitoring (how we’ll know it’s working)
+
+We don’t need anything fancy to start. In v1, we should at least be able to answer:
+
+- how many observations we ingested today
+- how many photos we classified today
+- how many photos are waiting to be classified (backlog)
+- how many failures happened (and why)
+- roughly how long it takes from “ingested” to “classified”
+
+This can be simple logs + a few database queries.
+
+## 10) Filtering specification (v1)
+
+### Starting filters (recommended)
+
+- **Species filter**: Monarch (Danaus plexippus)
+- **Data quality**: start with **research-grade** only (humans verified)
+- **Geography**: start with the **California Floristic Province** (or a practical proxy like California) and expand later
+- **Captive/cultivated**: default to excluding captive if the source provides that flag
+- **Update schedule**: daily is fine to start; can move to hourly later
+- **Cloud policy**: v1 “build mode” (don’t filter by photo license for classification)
+- **Image caching**: start by storing URLs (no large local image cache), add caching later if needed
+
+### Concrete iNaturalist example
+
+This URL shows the shape of the query we want to replicate in the API:
+
+`https://www.inaturalist.org/observations?place_id=62068&quality_grade=research&subview=map&taxon_id=48662`
+
+Notes:
+- `taxon_id=48662` is Monarch (Danaus plexippus).
+- `place_id=62068` is used as the California Floristic Province filter (we’ll confirm it’s the exact place we want).
+
+### Still-open choices
+
+- How exactly we define “California Floristic Province” in the source filters (place ID vs bounding box/polygon).
+- Whether we want to include needs-ID/casual later for completeness.
+ - How many times we retry a failing photo before we “park” it (example: 5–10 attempts, then stop retrying until we manually reset it).
 
 ## 11) Glossary (no-jargon)
 

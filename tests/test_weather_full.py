@@ -95,3 +95,28 @@ def test_restart_retains_adaptive_backoff_but_allows_faster_target():
         assert t.snapshot()['daymet']['cooldown_seconds']>58
         assert t.effective['landcover']==.125
     finally:t.client.close()
+
+
+def test_known_usgs_route_outage_retries_and_backs_off(monkeypatch):
+    import httpx
+    from monarch_phenology.weather_full import Transport
+    clock=[100.0]
+    monkeypatch.setattr('monarch_phenology.weather_full.time.monotonic',lambda:clock[0])
+    monkeypatch.setattr('monarch_phenology.weather_full.time.sleep',lambda s:clock.__setitem__(0,clock[0]+s))
+    responses=[httpx.Response(404,json={'detail':'No endpoint GET /geoserver/mrlc_Land-Cover-Native_conus_year_data/wms.'}) for _ in range(3)]
+    responses.append(httpx.Response(200,json={'features':[{'properties':{'PALETTE_INDEX':21}}]}))
+    t=Transport(1/32)
+    t.client.close()
+    t.client=httpx.Client(transport=httpx.MockTransport(lambda request:responses.pop(0)))
+    try:
+        result=t.fetch({'service':'landcover','params':'{}'})
+        assert result['status']=='ok'
+        assert result['attempts']==4
+        assert t.effective['landcover']==1/16
+        assert t.effective['daymet']==1/32
+        t.client.close()
+        t.client=httpx.Client(transport=httpx.MockTransport(lambda request:httpx.Response(404,text='Unrelated missing resource')))
+        result=t.fetch({'service':'landcover','params':'{}'})
+        assert result['status']=='request_error'
+        assert result['attempts']==1
+    finally:t.client.close()

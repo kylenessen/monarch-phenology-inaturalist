@@ -160,6 +160,16 @@ def decode_result(service, params, body):
     return {'status':status,'code':code,'label':CLASSES.get(code,'Unavailable'),'habitat':habitat_group({'landcover_status':status,'landcover_code':code})}
 
 
+def temporary_route_failure(service, code, body):
+    """USGS occasionally returns a gateway route error for its valid WMS URL."""
+    if service!='landcover' or code!=404:
+        return False
+    try:
+        return json.loads(body).get('detail')=='No endpoint GET /geoserver/mrlc_Land-Cover-Native_conus_year_data/wms.'
+    except (ValueError,AttributeError):
+        return False
+
+
 def save_result(db, job, result):
     params=json.loads(job['params'])
     with db:
@@ -218,7 +228,7 @@ class Transport:
         self.codes={s:Counter() for s in self.locks}
         self.successes={s:0 for s in self.locks}
         self.failures={s:0 for s in self.locks}
-        self.client=httpx.Client(timeout=90,follow_redirects=True,headers={'User-Agent':'monarch-phenology/0.1 (cached research point extraction)'})
+        self.client=httpx.Client(timeout=90,follow_redirects=True,limits=httpx.Limits(max_connections=128,max_keepalive_connections=128),headers={'User-Agent':'monarch-phenology/0.1 (cached research point extraction)'})
 
     def wait_turn(self, service):
         while True:
@@ -230,7 +240,7 @@ class Transport:
             # Release the lock while sleeping so responses can extend a shared cooldown.
             time.sleep(min(delay,1.0))
 
-    def record_response(self, service, code, retry_after=None):
+    def record_response(self, service, code, retry_after=None, transient=False):
         delay=0
         if code in (429,503):
             try:delay=float(retry_after or '30')
@@ -239,7 +249,7 @@ class Transport:
                 except (TypeError,ValueError):delay=30
         with self.locks[service]:
             self.codes[service][str(code)]+=1
-            self.failures[service]=self.failures[service]+1 if code>=500 else 0
+            self.failures[service]=self.failures[service]+1 if code>=500 or transient else 0
             if code in (429,503) or self.failures[service]>=3:
                 self.effective[service]=min(10,max(self.interval,self.effective[service]*2))
                 self.next[service]=max(self.next[service],time.monotonic()+max(5,delay))
@@ -278,18 +288,20 @@ class Transport:
     def fetch(self, job):
         service=job['service'];params=json.loads(job['params']);body=None;code=None
         for attempt in range(4):
+            transient=False
             self.wait_turn(service)
             try:
                 r=self.client.get(DAYMET if service=='daymet' else SERVICE,params=params)
                 body=r.text;code=r.status_code
-                self.record_response(service,code,r.headers.get('Retry-After'))
+                transient=temporary_route_failure(service,code,body)
+                self.record_response(service,code,r.headers.get('Retry-After'),transient=transient)
                 if service=='daymet' and code==400 and 'Tile was not found' in body:
                     return {'status':'outside_daymet_coverage','body':body,'response_code':code,'attempts':attempt+1}
                 r.raise_for_status()
                 result=decode_result(service,params,body)
                 return {**result,'body':body,'response_code':code,'attempts':attempt+1}
             except (httpx.HTTPError,ValueError,KeyError,StopIteration) as exc:
-                if (isinstance(exc,httpx.HTTPStatusError) and 400<=code<500 and code!=429) or attempt==3:
+                if (isinstance(exc,httpx.HTTPStatusError) and 400<=code<500 and code!=429 and not transient) or attempt==3:
                     return {'status':'request_error','error':str(exc)[:1500],'body':body[:16000] if body else None,'response_code':code,'attempts':attempt+1}
                 time.sleep(2**(attempt+1))
 
@@ -381,7 +393,7 @@ def main():
     p.add_argument('--workers',type=int,default=4,help='Concurrent workers per provider')
     p.add_argument('--interval',type=float,default=1.0,help='Minimum seconds between requests per provider')
     args=p.parse_args()
-    if args.workers<1 or args.interval<0.0625 or (args.limit is not None and args.limit<1):p.error('Invalid worker count, pacing or limit')
+    if not 1<=args.workers<=64 or not 1/64<=args.interval or (args.limit is not None and args.limit<1):p.error('Use 1 to 64 workers and an interval of at least 1/64 second')
     args.output.mkdir(parents=True,exist_ok=True)
     with (args.output/'run.lock').open('w') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

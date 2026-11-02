@@ -81,3 +81,21 @@ def test_sampling_weights_recover_the_eligible_population():
     assert quotas["tiny"] == 3
     assert quotas["small"] >= 8
     assert sum(quotas[k] * len(v) / quotas[k] for k, v in groups.items()) == 1023
+
+
+def test_report_weighted_statistics():
+    from monarch_phenology.weather_report import weighted_correlation, weighted_quantile
+
+    assert weighted_quantile([1, 2, 3], [1, 8, 1], [.05, .5, .95]) == [1, 2, 3]
+    rows = [{"x": v, "y": 2 * v + 4, "sampling_weight": v + 1} for v in range(4)]
+    assert weighted_correlation(rows, "x", "y") == pytest.approx(1)
+    assert weighted_correlation(rows[:2], "x", "y") is None
+
+
+def test_report_refuses_incomplete_enrichment(tmp_path):
+    from monarch_phenology.benchmark_jev import write_json
+    from monarch_phenology.weather_report import build_report
+
+    write_json(tmp_path / "manifest.json", {"samples": [{"id": 1}]})
+    with pytest.raises(ValueError, match="incomplete"):
+        build_report(tmp_path)

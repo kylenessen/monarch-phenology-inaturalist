@@ -105,7 +105,7 @@ function scatter(rows){
   const l=layout((x===fields[0]?'14-day minimum':'14-day maximum')+' ('+unit(x)+')',y===fields[2]?'Prior satellite AET (mm/day)':'14-day maximum ('+unit(y)+')');l.margin={l:58,r:25,t:22,b:55};l.yaxis.rangemode='normal';
   if(!traces.length)l.annotations=[{x:.5,y:.5,xref:'paper',yref:'paper',text:'No paired values for these filters',showarrow:false}];
   Plotly.react('scatter',traces,l,config);
-  const corr=correlation(rows,x,y);$('scatterNote').textContent=traces.reduce((n,t)=>n+t.x.length,0)+' pairs'+(corr===null?'':' · weighted Pearson r = '+corr.toFixed(2))+' · descriptive association';
+  const corr=correlation(rows,x,y),nPairs=traces.reduce((n,t)=>n+t.x.length,0);$('scatterNote').textContent=nPairs+(nPairs===1?' pair':' pairs')+(corr===null?'':' · weighted Pearson r = '+corr.toFixed(2))+' · descriptive association';
 }
 function render(){
   const rows=selected(),temps=rows.filter(r=>valid(r,fields[0])),aet=rows.filter(r=>valid(r,fields[2]));

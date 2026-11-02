@@ -63,6 +63,26 @@ Use `--build-only` to regenerate the page from a completed cache. Use a differen
 
 The November 2, 2026 snapshot fetched 136,885 observations. It retained 121,442 after excluding 15,439 obscured or private locations and four conflicting or disputed stage annotations. The retained dataset contains 109,163 larvae and 12,279 pupae across 43 represented years. The default accuracy filter displays 113,634 observations. Another 7,808 have reported uncertainty greater than 1 km. Of the retained observations, 19,850 have unstated accuracy. These totals describe observation records, not independently verified animals.
 
+### Antecedent weather pilot
+
+The weather pilot selects 600 reproducible observations from 81,214 eligible records in 2001–2025 with known coordinate accuracy no worse than 1 km. Sampling covers 24 region, season, and stage combinations. Each stratum receives at least eight samples, with the remaining allocation proportional to its population. Sampling weights are retained so the report can show either raw counts or weighted percentages within each region. The California coastal region is inside California and within 50 km of the Natural Earth coastline. Eastern North America is east of 100 degrees west. Other western observations form the third group.
+
+```sh
+uv run python -m monarch_phenology.weather_pilot
+uv run python -m monarch_phenology.weather_report
+uv run python -m http.server 8769 --bind 127.0.0.1 --directory runs/weather-pilot
+```
+
+Open [the local weather report](http://127.0.0.1:8769/). It includes three histograms, selectable scatterplots, descriptive weighted correlations, region and season filters, life stage filters, Fahrenheit and Celsius, coverage counts, an observation-level CSV, and PNG and PDF figures. Keep the server running while viewing it. All chart assets are cached locally.
+
+[Daymet V4 R1](https://daymet.ornl.gov/overview) provides daily minimum and maximum temperature estimates at 1 km. The temperature metrics are the lowest daily minimum and highest daily maximum over the exact 14 days before the observation, excluding the observation date. Complete coverage of all 14 dates is required. Daymet omits December 31 in leap years, so windows crossing that missing date are excluded without interpolation. Locations outside the Daymet mask remain unavailable. These are interpolated weather-station estimates, not direct measurements at each observation.
+
+[MODIS MOD16A2GF V061](https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MOD16A2GF) provides actual evapotranspiration at nominal 500 m resolution in eight-day composites. The AET metric is the total ET in the two most recent fully completed composites divided by their combined duration. This is usually 16 days, ending one to eight days before the observation. Year-end windows can be shorter. This is deliberately different from an exact 14-day daily AET median. No composite contains the observation date or a later day, although gap filling uses retrospective annual inputs. Both composites must have valid nonnegative ET, a good MODLAND quality bit, and science quality category 0 or 1. Values use the 0.1 scale factor and are reported in millimeters per day. Urban and other land-cover masks and failed quality flags stay missing, and the point is never moved to a nearby vegetated pixel.
+
+Per-observation results, complete daily temperature windows, AET composite dates and quality flags, sampling strata, and original service responses are cached under `runs/weather-pilot`. Re-running resumes pending records. `--retry-errors` also retries saved request failures. `--limit 12` runs a small smoke test without changing the sample. To run a different sample or `--all`, choose a new output directory. The report refuses an unfinished run unless `--preview` explicitly labels it partial.
+
+The weights correct the sampling design, not observer effort or missing weather data. AET masking can strongly change the geographic composition of complete cases, especially in urban coastal locations. Neither an empty histogram bin nor a Pearson correlation establishes a breeding threshold or temperature causation. The next inferential step would require comparable available conditions, such as matched background dates and locations, and explicit treatment of season, latitude, host plants, repeated observations, and detection effort.
+
 Early development. Project structure and data pipeline under construction.
 
 ## License

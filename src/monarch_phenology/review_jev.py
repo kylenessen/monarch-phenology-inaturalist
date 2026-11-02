@@ -1,6 +1,7 @@
 """Build a local HTML reviewer for a completed Jev benchmark."""
 
 import argparse
+import base64
 import csv
 import json
 from pathlib import Path
@@ -27,6 +28,7 @@ def build_review(run_dir: Path) -> Path:
                 "image_path", "license_code", "attribution",
             )},
             "prediction": result.get("prediction", "unavailable"),
+            "image_src": "data:image/jpeg;base64," + base64.b64encode((run_dir / image).read_bytes()).decode("ascii"),
             "confidence": result.get("confidence"),
             "stage_probabilities": result.get("stage_probabilities", {}),
             "reasons": row["review_reasons"].split(", "),

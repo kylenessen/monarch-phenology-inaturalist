@@ -217,7 +217,9 @@ class Fetcher:
                 temp.write_text(body)
                 temp.replace(path)
                 return body
-            except (httpx.HTTPError, ValueError):
+            except (httpx.HTTPError, ValueError) as exc:
+                if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code < 500 and exc.response.status_code != 429:
+                    raise
                 if attempt == 4:
                     raise
                 time.sleep(min(30, 2 ** (attempt + 1)))
@@ -233,6 +235,8 @@ def enrich(row: dict, fetcher: Fetcher) -> dict:
         result.update(parse_daymet(response, observed))
     except (httpx.HTTPError, ValueError, KeyError) as exc:
         result.update(temperature_status="request_error", temperature_error=str(exc)[:400])
+        if isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code == 400 and "Tile was not found" in exc.response.text:
+            result.update(temperature_status="outside_daymet_coverage", temperature_error="No Daymet tile contains this coordinate")
     periods = completed_composites(observed)
     try:
         response = fetcher.get("modis", MODIS, {"latitude": row["lat"], "longitude": row["lon"], "startDate": periods[0][0].strftime("A%Y%j"), "endDate": periods[-1][0].strftime("A%Y%j"), "kmAboveBelow": 0, "kmLeftRight": 0})
@@ -251,12 +255,18 @@ def main() -> None:
     parser.add_argument("--workers", type=int, default=6)
     parser.add_argument("--all", action="store_true", help="Enrich every eligible observation instead of sampling.")
     parser.add_argument("--limit", type=int, help="Process only this many pending observations for a smoke test.")
+    parser.add_argument("--retry-errors", action="store_true", help="Retry saved request failures as well as pending observations.")
     args = parser.parse_args()
     args.output.mkdir(parents=True, exist_ok=True)
     manifest = sample_observations(args.source, args.output, args.sample_size, args.seed, args.all)
     directory = args.output / "observations"
     directory.mkdir(exist_ok=True)
-    pending = [r for r in manifest["samples"] if not (directory / f"{r['id']}.json").exists()]
+    pending = []
+    for row in manifest["samples"]:
+        path = directory / f"{row['id']}.json"
+        saved = json.loads(path.read_text()) if path.exists() else None
+        if saved is None or (args.retry_errors and any(saved.get(k) == "request_error" for k in ("temperature_status", "aet_status"))):
+            pending.append(row)
     if args.limit is not None:
         pending = pending[:args.limit]
     print(f"Sampled {len(manifest['samples'])} of {manifest['eligible_population']:,} eligible observations. Processing {len(pending)} pending records.", flush=True)

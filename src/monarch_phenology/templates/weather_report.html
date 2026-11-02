@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monarch atlas · Weather before observation</title>
+<style>
+:root{--ink:#293b31;--muted:#687369;--paper:#fffdf7;--line:#dfe4da;--green:#294f3d}*{box-sizing:border-box}body{margin:0;background:#f2f4ed;color:var(--ink);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}a{color:#426455}header{height:72px;display:flex;align-items:center;justify-content:space-between;background:var(--paper);padding:0 30px;border-bottom:1px solid var(--line)}.brand{display:flex;align-items:center;gap:12px}.mark{display:grid;place-items:center;border-radius:50%;width:37px;height:37px;background:var(--green);color:#ffce83;font-size:23px}.brand strong{font-size:17px}.brand small{display:block;font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}header nav{display:flex;gap:18px;font-size:12px}main{max-width:1450px;margin:auto;padding:31px 30px 50px}.eyebrow{font-size:10px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted);font-weight:600}h1{font:36px/1.15 Georgia,serif;letter-spacing:-.6px;margin:9px 0 12px}.intro{max-width:850px;color:var(--muted);font-size:13px;margin:0 0 22px}.filters{display:flex;gap:16px;align-items:flex-end;flex-wrap:wrap;padding:17px 19px;background:var(--paper);border:1px solid var(--line);border-radius:12px}.filter label{display:block;font-size:10px;color:var(--muted);font-weight:650;letter-spacing:.3px;margin-bottom:5px}.filter select{padding:8px 30px 8px 9px;border:1px solid var(--line);border-radius:6px;background:white;color:var(--ink);font:12px inherit;max-width:230px}.filter{flex:1;min-width:110px}.filter select{width:100%}select,button{cursor:pointer}select:focus-visible,a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #bd682c;outline-offset:3px}.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin:17px 0}.card{background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:17px 19px}.card .label{font-size:11px;color:var(--muted)}.card .number{display:block;font-size:27px;line-height:1.2;margin:4px 0 5px;font-weight:550;letter-spacing:-.7px}.card small{font-size:10px;color:var(--muted)}.chart-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}.chart-card{min-width:0;background:var(--paper);border:1px solid var(--line);border-radius:12px;overflow:hidden}.chart-heading{padding:17px 18px 0}.chart-heading h2{font-size:14px;margin:0 0 3px;font-weight:650}.chart-heading p{font-size:11px;color:var(--muted);margin:0}.chart{height:300px;width:100%}.legend{display:flex;flex-wrap:wrap;gap:17px;margin:18px 2px 11px;font-size:11px}.legend span{display:flex;align-items:center;gap:6px}.legend i{display:block;width:10px;height:10px;border-radius:50%}.plot-note{font-size:11px;color:var(--muted);margin:10px 2px 18px;max-width:1050px}.bottom-grid{display:grid;grid-template-columns:2fr 1fr;gap:15px}.scatter{height:375px}.scatter-head{display:flex;gap:12px;justify-content:space-between;align-items:center}.scatter-head select{font:12px inherit;background:white;border:1px solid var(--line);border-radius:6px;padding:7px;max-width:220px}.interpretation{padding:21px}.interpretation h2{font:24px Georgia,serif;margin:0 0 15px}.interpretation p{font-size:12px;line-height:1.7;color:#546354}.interpretation strong{color:var(--ink)}.coverage{margin-top:17px;padding:20px}.coverage h2{font-size:15px;margin:0 0 10px}table{width:100%;border-collapse:collapse;font-size:12px}th{text-align:left;color:var(--muted);font-weight:500}td,th{padding:9px 7px;border-bottom:1px solid var(--line)}td:not(:first-child),th:not(:first-child){text-align:right}.coverage small{display:block;color:var(--muted);font-size:11px;margin-top:12px}details{background:var(--paper);border:1px solid var(--line);border-radius:12px;margin-top:17px;padding:16px 20px}summary{cursor:pointer;font-size:13px;font-weight:600}details p{font-size:12px;color:#556354;line-height:1.75;max-width:1150px}footer{font-size:11px;color:var(--muted);margin-top:20px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.preview{background:#fff0c8;padding:10px 17px;border:1px solid #ebd7a8;border-radius:8px;margin-bottom:15px;font-size:12px}.hidden{display:none}.loading{padding:30px;background:var(--paper);text-align:center}.table-scroll{overflow-x:auto}.plotly-notifier{display:none}
+@media(max-width:1000px){main{padding:24px 18px}.chart-grid{grid-template-columns:1fr}.chart{height:300px}.bottom-grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}h1{font-size:30px}.scatter{height:360px}.filters{gap:10px}.filter{min-width:140px}}
+@media(max-width:550px){header{padding:0 14px;height:66px}.brand strong{font-size:15px}.brand small{font-size:8px}header nav{font-size:10px;gap:10px}.mark{display:none}main{padding:22px 12px}.cards{gap:8px}.card{padding:13px}.card .number{font-size:24px}.filter{min-width:125px}.scatter-head{display:block}.scatter-head select{margin-top:8px;width:100%}.legend{font-size:10px;gap:8px}.coverage{padding:15px}.coverage table{font-size:10px}.chart-heading{padding:15px 13px 0}}
+</style>
+</head>
+<body>
+<header><div class="brand"><span class="mark" aria-hidden="true">❋</span><div><strong>Monarch atlas</strong><small>Weather & phenology</small></div></div><nav><a href="http://127.0.0.1:8768/">Weekly map</a><a href="observations.csv" download>Download data</a></nav></header>
+<main>
+<div id="preview" class="preview hidden"></div>
+<div class="eyebrow">A first look at the thermal envelope</div>
+<h1>Conditions before observation.</h1>
+<p class="intro">How cold, how hot, and how much water was moving through the landscape before larvae and pupae were observed? Explore a stratified sample across North America, using daily temperature estimates at 1 km and actual evapotranspiration at 500 m.</p>
+<section class="filters" aria-label="Chart filters">
+<div class="filter"><label for="region">Region</label><select id="region"><option value="all">All regions</option></select></div>
+<div class="filter"><label for="stage">Life stage</label><select id="stage"><option value="all">Larvae and pupae</option><option value="larva">Larvae</option><option value="pupa">Pupae</option></select></div>
+<div class="filter"><label for="season">Season</label><select id="season"><option value="all">All seasons</option><option>Winter</option><option>Spring</option><option>Summer</option><option>Autumn</option></select></div>
+<div class="filter"><label for="units">Temperature units</label><select id="units"><option value="F">Fahrenheit · °F</option><option value="C">Celsius · °C</option></select></div>
+<div class="filter"><label for="scale">Histogram scale</label><select id="scale"><option value="weighted">Weighted % within region</option><option value="count">Raw sample counts</option></select></div>
+</section>
+<section class="cards" aria-label="Sample statistics">
+<div class="card"><span class="label">Selected observations</span><strong class="number" id="nSample">…</strong><small id="sampleNote"></small></div>
+<div class="card"><span class="label">Complete temperature windows</span><strong class="number" id="nTemperature">…</strong><small>All 14 preceding days required</small></div>
+<div class="card"><span class="label">Usable AET windows</span><strong class="number" id="nAet">…</strong><small>Both prior composites pass quality checks</small></div>
+<div class="card"><span class="label">Prior exposure in this sample</span><strong class="number" id="exposure">…</strong><small id="exposureNote"></small></div>
+</section>
+<div class="legend" id="legend"></div>
+<section class="chart-grid" aria-label="Weather histograms">
+<article class="chart-card"><div class="chart-heading"><h2>The coldest it got</h2><p>Lowest daily minimum, days D−14 through D−1</p></div><div id="minimum" class="chart" aria-label="Histogram of prior minimum temperature"></div></article>
+<article class="chart-card"><div class="chart-heading"><h2>The hottest it got</h2><p>Highest daily maximum, days D−14 through D−1</p></div><div id="maximum" class="chart" aria-label="Histogram of prior maximum temperature"></div></article>
+<article class="chart-card"><div class="chart-heading"><h2>Actual evapotranspiration</h2><p>Mean daily rate, last two completed satellite periods</p></div><div id="aet" class="chart" aria-label="Histogram of prior actual evapotranspiration"></div></article>
+</section>
+<p class="plot-note" id="histNote"></p>
+<section class="bottom-grid">
+<article class="chart-card"><div class="chart-heading scatter-head"><div><h2>Look at the variables together</h2><p id="scatterNote">Each point is one sampled observation. Hover for details.</p></div><select id="pair" aria-label="Scatterplot variables"><option value="minmax">Minimum vs maximum temperature</option><option value="minaet">Minimum temperature vs AET</option><option value="maxaet">Maximum temperature vs AET</option></select></div><div id="scatter" class="scatter" aria-label="Weather relationship scatterplot"></div></article>
+<article class="chart-card interpretation"><h2>What this can tell us</h2><p id="finding"></p><p>The dashed temperature lines mark <strong>freezing</strong> and your proposed <strong>100°F heat threshold</strong>. They are reference lines, not fitted biological limits.</p><p>These are conditions associated with observations. An empty bin does not establish that breeding cannot occur there. Observer effort, season, latitude, host plants, and repeated visits can all shape these distributions.</p><p>AET is a landscape water flux, not humidity or migration itself. Its missing values are especially common in urban pixels, so the AET subset can differ from the temperature sample.</p></article>
+</section>
+<section class="card coverage"><h2>How much data is available?</h2><div class="table-scroll"><table><thead><tr><th>Region</th><th>Sampled</th><th>Temperature</th><th>AET</th><th>Urban AET mask*</th></tr></thead><tbody id="coverageRows"></tbody></table></div><small>*Urban masks are one reason AET is unavailable. Other masks and rejected quality flags also occur. Missing values are never treated as zero.</small></section>
+<details><summary>Methods, sampling, and sources</summary>
+<p id="samplingMethod"></p>
+<p>The California coastal group is inside California and within 50 km of the Natural Earth coastline, measured in California Albers coordinates. Eastern North America is east of 100°W. The third group contains the remaining western observations. These are analysis groups, not population boundaries. Seasons are December–February, March–May, June–August, and September–November.</p>
+<p><a href="https://daymet.ornl.gov/overview" target="_blank" rel="noopener">Daymet V4 R1</a> estimates daily two-meter air temperature by interpolating weather-station observations to a 1 km grid. These are gridded estimates, not a thermometer at each monarch. We use the minimum of the 14 daily minima and the maximum of the 14 daily maxima, excluding the observation day. All 14 dates must be available. Daymet omits December 31 in leap years, so affected windows are excluded rather than silently filled.</p>
+<p><a href="https://developers.google.com/earth-engine/datasets/catalog/MODIS_061_MOD16A2GF" target="_blank" rel="noopener">MODIS MOD16A2GF V061</a> provides modeled actual evapotranspiration on a nominal 500 m grid in eight-day composites. We sum ET over the last two fully completed periods before the observation, then divide by their total days. This is normally a 16-day window ending one to eight days before the observation. The year-end period is shorter. It is not a daily AET median or an exact 14-day estimate. No composite includes the observation day or later days, although this gap-filled product is processed retrospectively using annual inputs.</p>
+<p>MODIS ET values are multiplied by 0.1 to obtain millimeters per composite. Both composites must have valid, nonnegative ET, a good MODLAND flag, and a science quality flag of 0 or 1. Urban, water, sparse vegetation, other fill values, and rejected quality flags remain missing. We use the containing pixel without moving the point to a nearby vegetated pixel. Location uncertainty up to 1 km can still exceed the nominal AET pixel size.</p>
+<p>Sampling weights correct the deliberate oversampling of small region–season–stage groups. They do not correct iNaturalist observer effort or missing weather and AET data. Weighted percentages are normalized separately within each region using valid records for each variable. The plots therefore describe the eligible observations, with additional complete-case selection for AET. Scatterplots show individual sampled records without weight-dependent point sizes. Pearson correlations use sampling weights and describe the selected complete cases. They do not adjust for season, latitude, or other confounding variables. Observations are not independent absences, unique animals, or confirmed successful reproduction.</p>
+<p>Temperature data were retrieved using the <a href="https://daymet.ornl.gov/web_services" target="_blank" rel="noopener">Daymet single-pixel service</a>. AET uses the <a href="https://modis.ornl.gov/data/modis_webservice.html" target="_blank" rel="noopener">ORNL TESViS service</a>. Region geometry comes from <a href="https://www.naturalearthdata.com/downloads/10m-physical-vectors/" target="_blank" rel="noopener">Natural Earth</a>. Source responses, the sampling manifest, and per-observation date windows are cached beside this report.</p>
+</details>
+<footer><span id="footerText"></span><span><a href="weather-distributions.png" target="_blank">Full figure PNG</a> · <a href="weather-distributions.pdf" target="_blank">PDF</a> · <a href="observations.csv" download>Observation data CSV</a></span></footer>
+<div id="loading" class="loading" role="status">Preparing the charts…</div>
+</main>
+<script id="weather-data" type="application/json">__WEATHER_DATA__</script>
+<script src="assets/plotly.min.js"></script>
+<script>
+'use strict';
+try {
+const DATA=JSON.parse(document.getElementById('weather-data').textContent);
+const $=id=>document.getElementById(id), fmt=n=>n.toLocaleString('en-US');
+const fields=['tmin_14d_c','tmax_14d_c','aet_mm_day'];
+const valid=(r,f)=>Number.isFinite(r[f]);
+const convert=(value,field)=>field!=='aet_mm_day'&&$('units').value==='F'?value*1.8+32:value;
+const unit=field=>field==='aet_mm_day'?'mm/day':'°'+$('units').value;
+const threshold=field=>field==='tmin_14d_c'?convert(0,field):convert((100-32)/1.8,field);
+const config={responsive:true,displaylogo:false,showSendToCloud:false,modeBarButtonsToRemove:['lasso2d','select2d'],toImageButtonOptions:{format:'png',scale:2}};
+DATA.regions.forEach(region=>{$('region').add(new Option(region,region));const item=document.createElement('span'),dot=document.createElement('i');dot.style.background=DATA.colors[region];item.append(dot,document.createTextNode(region));$('legend').appendChild(item);});
+if(!DATA.summary.complete){$('preview').classList.remove('hidden');$('preview').textContent='Partial preview · '+DATA.summary.completed+' of '+DATA.summary.sample_size+' observations processed. Downloads are still running.';}
+$('samplingMethod').textContent=DATA.summary.sample_size+' observations were selected reproducibly from '+fmt(DATA.summary.eligible_population)+' eligible human-annotated larva and pupa observations in 2001–2025. The sample spans 24 region–season–stage strata, with at least eight observations per stratum and the remaining allocation proportional to population size. Within each stratum, observations are selected uniformly without replacement. Each weight is the stratum population divided by its sample size. We exclude obscured locations, disputed or conflicting stage labels, unknown coordinate accuracy, and reported accuracy worse than 1 km. Current-year 2026 observations are outside the common complete-year coverage.';
+$('footerText').textContent='Reproducible pilot · '+DATA.summary.sample_size+' sampled records · 2001–2025 · no model calls';
+function selected(){return DATA.rows.filter(r=>($('region').value==='all'||r.region===$('region').value)&&($('stage').value==='all'||r.stage===$('stage').value)&&($('season').value==='all'||r.season===$('season').value));}
+function layout(xlabel,ylabel){return {paper_bgcolor:'#fffdf7',plot_bgcolor:'#fffdf7',font:{family:'Arial, sans-serif',color:'#536354',size:11},margin:{l:52,r:18,t:26,b:51},showlegend:false,hovermode:'closest',xaxis:{title:{text:xlabel,font:{size:11}},gridcolor:'#e7eae1',zeroline:false,fixedrange:false},yaxis:{title:{text:ylabel,font:{size:11}},gridcolor:'#e7eae1',zeroline:false,rangemode:'tozero'},uirevision:[$('region').value,$('stage').value,$('season').value,$('units').value,$('scale').value].join('|')};}
+function histogram(id,field,rows){
+  const weighted=$('scale').value==='weighted';
+  const universe=DATA.rows.filter(r=>valid(r,field)).map(r=>convert(r[field],field));
+  const width=field==='aet_mm_day'?0.5:$('units').value==='F'?5:2;
+  let low=Math.min(...universe,field==='aet_mm_day'?0:threshold(field)),high=Math.max(...universe,field==='aet_mm_day'?1:threshold(field));
+  low=Math.floor(low/width)*width;high=Math.ceil(high/width)*width+width;
+  const count=Math.max(1,Math.round((high-low)/width));
+  const traces=[];
+  for(const region of DATA.regions){
+    const subset=rows.filter(r=>r.region===region&&valid(r,field));if(!subset.length)continue;
+    const totals=Array(count).fill(0),counts=Array(count).fill(0);
+    const denominator=subset.reduce((s,r)=>s+r.sampling_weight,0);
+    for(const row of subset){const bin=Math.min(count-1,Math.max(0,Math.floor((convert(row[field],field)-low)/width)));counts[bin]++;totals[bin]+=weighted?100*row.sampling_weight/denominator:1;}
+    traces.push({type:'bar',name:region,x:totals.map((_,i)=>low+(i+.5)*width),y:totals,width:width*.96,marker:{color:DATA.colors[region],opacity:rows.some(r=>r.region!==region)?.45:.8,line:{color:DATA.colors[region],width:.8}},customdata:totals.map((_,i)=>[counts[i],(low+i*width).toFixed(field==='aet_mm_day'?1:0),(low+(i+1)*width).toFixed(field==='aet_mm_day'?1:0)]),hovertemplate:'%{customdata[1]} to %{customdata[2]} '+unit(field)+'<br>%{customdata[0]} sampled observations<br>'+(weighted?'%{y:.1f}% weighted share':'%{y} observations')+'<extra>'+region+'</extra>'});
+  }
+  const l=layout(field==='aet_mm_day'?'AET (mm/day)':'Temperature ('+unit(field)+')',weighted?'Within-region share (%)':'Sample observations');l.barmode='overlay';l.xaxis.range=[low,high];
+  if(field!=='aet_mm_day'){const line=threshold(field);l.shapes=[{type:'line',x0:line,x1:line,y0:0,y1:1,yref:'paper',line:{color:'#9c5343',width:1.3,dash:'dash'}}];l.annotations=[{x:line,y:1.08,yref:'paper',text:field==='tmin_14d_c'?'Freezing':($('units').value==='F'?'100°F':'37.8°C'),showarrow:false,font:{size:10,color:'#9c5343'}}];}
+  if(!traces.length)l.annotations=[{x:.5,y:.5,xref:'paper',yref:'paper',text:'No usable values for these filters',showarrow:false}];
+  Plotly.react(id,traces,l,config);
+}
+function correlation(rows,x,y){
+  const pairs=rows.filter(r=>valid(r,x)&&valid(r,y));if(pairs.length<3)return null;
+  const total=pairs.reduce((s,r)=>s+r.sampling_weight,0),mx=pairs.reduce((s,r)=>s+r[x]*r.sampling_weight,0)/total,my=pairs.reduce((s,r)=>s+r[y]*r.sampling_weight,0)/total;
+  let covariance=0,vx=0,vy=0;for(const r of pairs){const a=r[x]-mx,b=r[y]-my;covariance+=r.sampling_weight*a*b;vx+=r.sampling_weight*a*a;vy+=r.sampling_weight*b*b;}
+  return vx>0&&vy>0?covariance/Math.sqrt(vx*vy):null;
+}
+function scatter(rows){
+  const pair=$('pair').value,[x,y]=pair==='minmax'?[fields[0],fields[1]]:pair==='minaet'?[fields[0],fields[2]]:[fields[1],fields[2]];
+  const traces=[];
+  for(const region of DATA.regions){const subset=rows.filter(r=>r.region===region&&valid(r,x)&&valid(r,y));if(!subset.length)continue;traces.push({type:'scatter',mode:'markers',name:region,x:subset.map(r=>convert(r[x],x)),y:subset.map(r=>convert(r[y],y)),marker:{color:DATA.colors[region],size:7,opacity:.65},customdata:subset.map(r=>[r.id,r.date,r.stage,r.aet_start,r.aet_end]),hovertemplate:'#%{customdata[0]} · %{customdata[1]} · %{customdata[2]}<br>X %{x:.2f} '+unit(x)+' · Y %{y:.2f} '+unit(y)+(y==='aet_mm_day'?'<br>AET %{customdata[3]} through %{customdata[4]}':'')+'<extra>'+region+'</extra>'});}
+  const l=layout((x===fields[0]?'14-day minimum':'14-day maximum')+' ('+unit(x)+')',y===fields[2]?'Prior satellite AET (mm/day)':'14-day maximum ('+unit(y)+')');l.margin={l:58,r:25,t:22,b:55};l.yaxis.rangemode='normal';
+  if(!traces.length)l.annotations=[{x:.5,y:.5,xref:'paper',yref:'paper',text:'No paired values for these filters',showarrow:false}];
+  Plotly.react('scatter',traces,l,config);
+  const corr=correlation(rows,x,y);$('scatterNote').textContent=traces.reduce((n,t)=>n+t.x.length,0)+' pairs'+(corr===null?'':' · weighted Pearson r = '+corr.toFixed(2))+' · descriptive association';
+}
+function render(){
+  const rows=selected(),temps=rows.filter(r=>valid(r,fields[0])),aet=rows.filter(r=>valid(r,fields[2]));
+  const cold=temps.filter(r=>r.tmin_14d_c<=0).length,hot=temps.filter(r=>r.tmax_14d_c>=(100-32)/1.8).length;
+  $('nSample').textContent=fmt(rows.length);$('nTemperature').textContent=fmt(temps.length);$('nAet').textContent=fmt(aet.length);$('sampleNote').textContent='Of '+DATA.summary.sample_size+' sampled observations';
+  $('exposure').textContent=cold+' cold · '+hot+' hot';$('exposureNote').textContent='Raw counts ≤'+($('units').value==='F'?'32°F':'0°C')+' or ≥'+($('units').value==='F'?'100°F':'37.8°C')+' in '+temps.length+' complete windows';
+  $('histNote').textContent=$('scale').value==='weighted'?'Each region sums to 100% among its valid records. Weights correct the stratified sample, not observer effort or missing data. Switch to raw counts to see the number of sampled observations in each bin.':'Bars count sampled observations. Sparse region–season–stage groups were deliberately oversampled, so raw counts do not represent their frequency in the full dataset.';
+  $('finding').textContent=temps.length?'In the selected sample, '+cold+' of '+temps.length+' complete temperature windows include freezing or colder conditions, and '+hot+' reach at least 100°F. '+aet.length+' of '+rows.length+' observations have usable AET. These counts describe the sample, not thermal tolerance.':'No complete temperature windows match the selected filters.';
+  ['minimum','maximum','aet'].forEach((id,i)=>histogram(id,fields[i],rows));scatter(rows);
+  $('coverageRows').replaceChildren();
+  for(const region of DATA.regions){const group=rows.filter(r=>r.region===region);if(!group.length)continue;const urban=group.filter(r=>r.urban_masked_aet).length;const tr=document.createElement('tr');[region,group.length,group.filter(r=>valid(r,fields[0])).length,group.filter(r=>valid(r,fields[2])).length,urban].forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});$('coverageRows').appendChild(tr);}
+}
+['region','stage','season','units','scale','pair'].forEach(id=>$(id).onchange=render);
+render();$('loading').remove();
+} catch(error){document.getElementById('loading').textContent='The charts could not load. Keep the assets folder beside this HTML file. '+error.message;console.error(error);}
+</script>
+</body>
+</html>

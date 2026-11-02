@@ -96,7 +96,9 @@ def figures(rows: list[dict], output: Path, complete: bool) -> None:
     fig.suptitle("Conditions before monarch larva and pupa observations" + ("" if complete else " · PARTIAL PREVIEW"), fontsize=18, x=0.055, ha="left", y=0.98)
     fig.text(0.055, 0.935, f"{len(rows)} stratified observations · 2001–2025 · Daymet 1 km · MODIS MOD16A2GF 500 m", fontsize=10, color="#647066")
     fig.legend([Line2D([], [], color=COLORS[r], linewidth=2) for r in REGIONS], REGIONS, loc="upper center", bbox_to_anchor=(0.5, 0.916), ncol=3, frameon=False, fontsize=9)
-    fig.text(0.055, 0.035, "Temperature uses days D−14 through D−1. AET averages the last two completed composites, usually 16 days ending 1–8 days before D.\nHistogram weights correct the sample design, not observer effort or missing AET. Scatter points are individual sampled observations. Presence-only distributions do not identify breeding limits.", fontsize=8, color="#647066")
+    dead = sum(r.get("human_alive_status") == "dead" for r in rows)
+    flagged = sum(r.get("temperature_audit_flag") == "large_disagreement" for r in rows)
+    fig.text(0.055, 0.025, "Temperature uses days D−14 through D−1. AET averages the last two completed composites, usually 16 days ending 1–8 days before D.\nHistogram weights correct the sample design, not observer effort or missing AET. Scatter points are sampled observations. Presence-only distributions do not identify breeding limits.\n" + f"Includes {dead} observations annotated dead and {flagged} with a large weather-product disagreement. Inspect these records and sensitivity filters in the interactive report.", fontsize=8, color="#647066", va="bottom")
     fig.subplots_adjust(top=0.81, bottom=0.13, left=0.055, right=0.98, hspace=0.36, wspace=0.3)
     fig.savefig(output / "weather-distributions.png", dpi=180)
     fig.savefig(output / "weather-distributions.pdf")
@@ -107,15 +109,19 @@ def build_report(output: Path, preview: bool = False) -> Path:
     manifest = json.loads((output / "manifest.json").read_text())
     paths = [output / "observations" / f"{r['id']}.json" for r in manifest["samples"]]
     rows = [json.loads(p.read_text()) for p in paths if p.exists()]
+    audit_path = output / "audit.json"
+    audit = json.loads(audit_path.read_text()) if audit_path.exists() else {"records": {}}
     for row in rows:
         row["urban_masked_aet"] = any(c.get("raw_et") == 32762 for c in row.get("aet_composites", []))
+        row.update(audit["records"].get(str(row["id"]), {"human_alive_status": "not_audited", "temperature_audit_flag": "not_checked"}))
     complete = len(rows) == len(paths)
     if not complete and not preview:
         raise ValueError("Weather enrichment is incomplete. Use --preview to mark a partial report.")
     summaries = {"all": summarize(rows), **{region: summarize([r for r in rows if r["region"] == region]) for region in REGIONS}}
-    summary = {"complete": complete, "sample_size": len(manifest["samples"]), "completed": len(rows), "eligible_population": manifest["eligible_population"], "groups": summaries}
+    summary = {"complete": complete, "sample_size": len(manifest["samples"]), "completed": len(rows), "eligible_population": manifest["eligible_population"], "groups": summaries, "life_status": dict(Counter(r["human_alive_status"] for r in rows)), "temperature_audit": dict(Counter(r["temperature_audit_flag"] for r in rows))}
     write_json(output / "summary.json", summary)
     fields = ["id", "date", "stage", "region", "season", "lat", "lon", "accuracy", "sampling_weight", "temperature_status", "temperature_start", "temperature_end", "temperature_days", *FIELDS[:2], "freezing_days", "hot_days", "aet_status", "aet_start", "aet_end", "aet_window_days", "aet_lag_days", FIELDS[2], "urban_masked_aet"]
+    fields += ["human_alive_status", "temperature_audit_flag", "era5_tmin_14d_c", "era5_tmax_14d_c", "temperature_audit_max_difference_c"]
     with (output / "observations.csv").open("w", newline="") as handle:
         writer = csv.DictWriter(handle, fields, extrasaction="ignore")
         writer.writeheader()

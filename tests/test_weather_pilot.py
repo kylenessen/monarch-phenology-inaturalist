@@ -99,3 +99,11 @@ def test_report_refuses_incomplete_enrichment(tmp_path):
     write_json(tmp_path / "manifest.json", {"samples": [{"id": 1}]})
     with pytest.raises(ValueError, match="incomplete"):
         build_report(tmp_path)
+
+
+def test_life_status_does_not_treat_unannotated_as_alive():
+    from monarch_phenology.weather_audit import life_status
+
+    assert life_status({"annotations": []}) == "unannotated"
+    assert life_status({"annotations": [{"controlled_attribute_id": 17, "controlled_value_id": 19}]}) == "dead"
+    assert life_status({"annotations": [{"controlled_attribute_id": 17, "controlled_value_id": 18, "votes": [{"vote_flag": False}]}]}) == "disputed"

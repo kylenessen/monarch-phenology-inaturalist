@@ -69,6 +69,7 @@ The weather pilot selects 600 reproducible observations from 81,214 eligible rec
 
 ```sh
 uv run python -m monarch_phenology.weather_pilot
+uv run python -m monarch_phenology.weather_audit
 uv run python -m monarch_phenology.weather_report
 uv run python -m http.server 8769 --bind 127.0.0.1 --directory runs/weather-pilot
 ```
@@ -82,6 +83,10 @@ Open [the local weather report](http://127.0.0.1:8769/). It includes three histo
 Per-observation results, complete daily temperature windows, AET composite dates and quality flags, sampling strata, and original service responses are cached under `runs/weather-pilot`. Re-running resumes pending records. `--retry-errors` also retries saved request failures. `--limit 12` runs a small smoke test without changing the sample. To run a different sample or `--all`, choose a new output directory. The report refuses an unfinished run unless `--preview` explicitly labels it partial.
 
 The weights correct the sampling design, not observer effort or missing weather data. AET masking can strongly change the geographic composition of complete cases, especially in urban coastal locations. Neither an empty histogram bin nor a Pearson correlation establishes a breeding threshold or temperature causation. The next inferential step would require comparable available conditions, such as matched background dates and locations, and explicit treatment of season, latitude, host plants, repeated observations, and detection effort.
+
+The completed pilot has 595 complete temperature windows and 311 usable AET windows. Three sampled locations fall outside Daymet coverage and two windows cross the omitted leap-year date. Twelve of the 595 complete temperature windows reach freezing or below, and 15 reach at least 100 degrees Fahrenheit. Their sampling-weighted shares are about 1.08 and 1.75 percent. These describe associations among sampled observations, not survival limits. AET is available for only 18 of 110 California coastal records, compared with 252 of 408 eastern records and 41 of 82 other western records. Urban masks account for 246 missing AET windows, including 90 on the California coast.
+
+The optional audit joins existing alive/dead annotations and checks extreme Daymet windows against ERA5-Land through Open-Meteo at about 9 km. It checks windows reaching freezing, 100 degrees Fahrenheit, or a daily temperature range of at least 40 degrees Celsius. The pilot has three records annotated dead, including the coldest pupa record. Of 26 weather windows cross-checked, one has a minimum or maximum differing by at least 10 degrees Celsius. Observation 180392679 has a Daymet minimum of -9.12 degrees Celsius and an ERA5-Land minimum of 12.4 degrees Celsius for the same dates. This is flagged for review. Original values remain unchanged, and the interactive report can exclude known-dead records or large weather disagreements. The screening rule is exploratory, not a validated error cutoff. The remaining 574 temperature windows were not independently cross-checked.
 
 Early development. Project structure and data pipeline under construction.
 

@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime, timezone
 import json
 import math
 from pathlib import Path
 import time
+from threading import Lock
 
 import h3
 import httpx
@@ -45,24 +47,48 @@ def fetch_observations(output: Path) -> dict:
         write_json(manifest_path, manifest)
     if manifest["complete"]:
         return manifest
-    cached = sorted(pages.glob("*.json"))
+    cached = sorted(pages.glob("[0-9]*.json"))
     last_id = None
-    count = 0
     for path in cached:
         page = json.loads(path.read_text())
-        count += len(page["results"])
         if page["results"]:
             last_id = min(row["id"] for row in page["results"])
-    index = len(cached)
-    last_request = 0.0
-    with httpx.Client(timeout=90, follow_redirects=True, headers={"User-Agent": "monarch-phenology/0.1.0"}) as client:
+    if "segments" not in manifest:
+        # Existing sequential pages are above last_id. Divide the remainder into
+        # disjoint ID intervals so slow responses can overlap without extra load.
+        if last_id is None:
+            with httpx.Client(timeout=90, follow_redirects=True) as head_client:
+                response = head_client.get(API, params={**manifest["params"], "per_page": 1})
+                response.raise_for_status()
+                head = response.json()
+            manifest["initial_total"] = head["total_results"]
+            manifest["maximum_id"] = head["results"][0]["id"] if head["results"] else 0
+            last_id = manifest["maximum_id"] + 1
+            time.sleep(1.1)
+        upper = last_id
+        bounds = sorted({0, min(100_000_000, upper), min(200_000_000, upper), min(300_000_000, upper), upper})
+        manifest["segments"] = [{"lower": a, "upper": b, "complete": False} for a, b in zip(bounds, bounds[1:])]
+        write_json(manifest_path, manifest)
+    rate_lock, manifest_lock = Lock(), Lock()
+    last_request = [0.0]
+
+    def fetch_segment(segment_index: int) -> None:
+        segment = manifest["segments"][segment_index]
+        if segment["complete"]:
+            return
+        segment_pages = sorted(pages.glob(f"segment-{segment_index}-*.json"))
+        cursor = segment["upper"]
+        for path in segment_pages:
+            rows = json.loads(path.read_text())["results"]
+            if rows:
+                cursor = min(row["id"] for row in rows)
+        index = len(segment_pages)
         while True:
-            params = {**manifest["params"]}
-            if last_id is not None:
-                params["id_below"] = last_id
+            params = {**manifest["params"], "id_above": segment["lower"] - 1, "id_below": cursor}
             for attempt in range(8):
-                time.sleep(max(0, 1.1 - (time.monotonic() - last_request)))
-                last_request = time.monotonic()
+                with rate_lock:
+                    time.sleep(max(0, 1.1 - (time.monotonic() - last_request[0])))
+                    last_request[0] = time.monotonic()
                 try:
                     response = client.get(API, params=params)
                     response.raise_for_status()
@@ -75,24 +101,34 @@ def fetch_observations(output: Path) -> dict:
                     time.sleep(min(60, 2 ** (attempt + 1)))
             rows = page["results"]
             ids = [row["id"] for row in rows]
-            if len(set(ids)) != len(ids) or (last_id is not None and any(i >= last_id for i in ids)):
+            if len(set(ids)) != len(ids) or any(i >= cursor or i < segment["lower"] for i in ids):
                 raise ValueError("Observation ID pagination did not advance cleanly")
-            if not cached and index == 0:
-                manifest["initial_total"] = page["total_results"]
-                manifest["maximum_id"] = max(ids) if ids else None
-            write_json(pages / f"{index:05d}.json", page)
-            count += len(rows)
+            write_json(pages / f"segment-{segment_index}-{index:05d}.json", page)
             index += 1
             if rows:
-                last_id = min(ids)
-            manifest.update(downloaded=count, pages=index, minimum_id=last_id)
-            if len(rows) < params["per_page"]:
-                manifest.update(complete=True, completed_at=datetime.now(timezone.utc).isoformat())
-            write_json(manifest_path, manifest)
-            if index % 10 == 0 or manifest["complete"]:
-                print(f"Fetched {count:,} / approximately {manifest.get('initial_total', 0):,} observations", flush=True)
-            if manifest["complete"]:
-                return manifest
+                cursor = min(ids)
+            with manifest_lock:
+                manifest["downloaded"] += len(rows)
+                manifest["pages"] += 1
+                segment["complete"] = len(rows) < params["per_page"]
+                write_json(manifest_path, manifest)
+                if manifest["pages"] % 20 == 0:
+                    print(f"Fetched {manifest['downloaded']:,} / approximately {manifest.get('initial_total', 0):,} observations", flush=True)
+            if segment["complete"]:
+                break
+
+    # Reconcile cached pages after a possible interruption between page and
+    # manifest writes. The source pages are authoritative for resume counts.
+    all_pages = list(pages.glob("*.json"))
+    manifest["downloaded"] = sum(len(json.loads(p.read_text())["results"]) for p in all_pages)
+    manifest["pages"] = len(all_pages)
+    with httpx.Client(timeout=90, follow_redirects=True, headers={"User-Agent": "monarch-phenology/0.1.0"}) as client:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            list(pool.map(fetch_segment, range(len(manifest["segments"]))))
+    manifest.update(complete=True, completed_at=datetime.now(timezone.utc).isoformat())
+    write_json(manifest_path, manifest)
+    print(f"Finished downloading {manifest['downloaded']:,} observations", flush=True)
+    return manifest
 
 
 def seasonal_week(observed: date) -> int:
@@ -136,9 +172,9 @@ ASSETS = {
 }
 
 
-def build_map(output: Path) -> Path:
+def build_map(output: Path, preview: bool = False) -> Path:
     manifest = json.loads((output / "source.json").read_text())
-    if not manifest.get("complete"):
+    if not manifest.get("complete") and not preview:
         raise ValueError("Download is incomplete. Resume it before building the map.")
     seen = set()
     excluded = Counter()
@@ -162,7 +198,7 @@ def build_map(output: Path) -> Path:
                 record["accuracy"], *[cells[c] for c in record["cells"]],
                 record["week"], record["seasonal_week"], record["quality"],
             ])
-    if len(seen) != manifest["downloaded"]:
+    if not preview and len(seen) != manifest["downloaded"]:
         raise ValueError("Cached source page count does not match the manifest")
     if not records:
         raise ValueError("No eligible observations to map")
@@ -176,7 +212,8 @@ def build_map(output: Path) -> Path:
     }
     geometries = [[cell, [[round(lat, 6), round(lon, 6)] for lat, lon in h3.cell_to_boundary(cell)]] for cell in cells]
     payload = {
-        "source": {key: manifest[key] for key in ("started_at", "completed_at", "place", "place_id")},
+        "source": {key: manifest.get(key) for key in ("started_at", "completed_at", "place", "place_id")},
+        "preview": not manifest.get("complete"),
         "cutoff": cutoff.isoformat(), "stats": stats, "cells": geometries, "observations": records,
         "columns": ["id", "date", "stage_0_larva_1_pupa", "accuracy_m", "h3_7_index", "h3_8_index", "week", "seasonal_week", "quality_grade"],
     }
@@ -205,11 +242,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, default=Path("runs/phenology-map"))
     parser.add_argument("--fetch-only", action="store_true")
     parser.add_argument("--build-only", action="store_true")
+    parser.add_argument("--preview", action="store_true", help="Allow an explicitly marked preview of an incomplete download.")
     args = parser.parse_args()
     if not args.build_only:
         fetch_observations(args.output)
     if not args.fetch_only:
-        print(build_map(args.output).resolve())
+        print(build_map(args.output, preview=args.preview).resolve())
 
 
 if __name__ == "__main__":

@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Monarch atlas · Early stages</title>
+<link rel="stylesheet" href="assets/leaflet.css">
+<style>
+:root{--ink:#293b31;--muted:#67736a;--paper:#fffdf7;--line:#e1e4da;--orange:#dc691c;--green:#294f3d}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:#e9eee9}button,select,input{font:inherit}button,select{cursor:pointer}button:focus-visible,select:focus-visible,input:focus-visible,a:focus-visible,summary:focus-visible{outline:3px solid #bc531c;outline-offset:3px}button{border:1px solid var(--line);border-radius:8px;background:var(--paper);color:var(--ink);padding:9px 13px}button:hover{background:#f1f2e9}button:disabled{opacity:.5;cursor:default}a{color:#925021}header{height:74px;position:relative;z-index:500;background:var(--paper);display:flex;align-items:center;justify-content:space-between;padding:0 28px;border-bottom:1px solid var(--line);gap:18px}.brand{display:flex;align-items:center;gap:12px}.mark{background:var(--green);color:#ffce83;width:39px;height:39px;display:grid;place-items:center;border-radius:50%;font-size:23px}.brand strong{font-size:17px;letter-spacing:-.4px}.brand small{display:block;font-size:10px;letter-spacing:1.7px;text-transform:uppercase;color:var(--muted)}.header-note{font-size:12px;color:var(--muted)}.top-actions{display:flex;align-items:center;gap:14px}.top-actions button{font-size:12px}#map{position:absolute;inset:74px 0 0;z-index:1;background:#e5ebe7}.leaflet-container{font:inherit}.leaflet-control-zoom a{color:var(--green)}.leaflet-top.leaflet-right{top:12px;right:14px}.leaflet-bottom.leaflet-right{bottom:209px}.leaflet-control-attribution{font-size:10px!important}.panel{background:rgba(255,253,247,.97);border:1px solid #dce0d4;border-radius:14px;box-shadow:0 6px 28px #24362b0e}.sidebar{position:absolute;z-index:450;left:24px;top:96px;width:304px;padding:23px}.eyebrow{font-size:10px;letter-spacing:1.8px;text-transform:uppercase;font-weight:650;color:var(--muted)}h1{font:400 31px/1.1 Georgia,serif;letter-spacing:-.7px;margin:10px 0 11px}.intro{font-size:12px;color:var(--muted);margin:0 0 19px}.field{display:block;margin:15px 0 5px;font-size:11px;color:var(--muted);font-weight:650}.select{width:100%;padding:9px 30px 9px 10px;border:1px solid var(--line);border-radius:7px;background:#fffefb;color:var(--ink)}.segmented{display:flex;gap:4px}.segmented button{padding:8px 0;flex:1;font-size:12px}.segmented button[aria-pressed=true]{background:var(--green);color:white;border-color:var(--green)}.subtle{font-size:11px;color:var(--muted)}.detail-row{display:flex;gap:14px;align-items:center}.detail-row>div{flex:1}.stat{border-top:1px solid var(--line);margin-top:19px;padding-top:16px}.stat strong{font-size:29px;letter-spacing:-1px;font-weight:550;line-height:1.1}.stat .split{display:flex;justify-content:space-between;margin-top:9px;font-size:12px}.stat p{margin:4px 0 0;font-size:11px;color:var(--muted)}.key{position:absolute;z-index:450;right:24px;bottom:238px;width:207px;padding:15px 17px}.key strong{font-size:12px;font-weight:600}.ramp{display:flex;height:13px;overflow:hidden;border-radius:3px;margin-top:11px}.ramp span{flex:1}.ramp-labels{display:flex;justify-content:space-between;font-size:10px;margin:5px -2px 10px}.key p{font-size:10px;color:var(--muted);margin:0}.date-badge{position:absolute;z-index:450;top:98px;left:calc(50% + 90px);transform:translateX(-50%);padding:11px 20px;text-align:center;min-width:215px;pointer-events:none}.date-badge strong{display:block;font-size:20px;letter-spacing:-.5px}.date-badge small{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}.timeline{position:absolute;z-index:500;bottom:26px;left:24px;right:24px;padding:15px 21px 16px}.timeline-head{display:flex;align-items:center;justify-content:space-between;gap:15px}.timeline-title strong{font-size:13px}.timeline-title small{display:block;font-size:11px;color:var(--muted)}.playback{display:flex;align-items:center;gap:7px}.play{background:var(--green);color:white;border-color:var(--green);min-width:91px}.play:hover{background:#366349}.step{padding:9px 12px}.playback label{font-size:11px;color:var(--muted);margin-left:8px}.speed{padding:7px 3px;border:0;background:transparent;color:var(--ink)}.chart{display:flex;align-items:flex-end;gap:2px;height:47px;margin:11px 0 0;border-bottom:1px solid #d8dbd1}.bar{border:0;padding:0;min-width:0;flex:1;border-radius:2px 2px 0 0;background:#d9d9b9;position:relative}.bar:hover{background:#d98b3a}.bar.active{background:var(--orange)}.slider{width:100%;height:14px;margin:1px 0 0;accent-color:var(--orange);cursor:ew-resize}.months{display:flex;justify-content:space-between;font-size:10px;color:var(--muted);margin:0 1px}.timeline-foot{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:var(--muted);margin-top:8px}.empty{position:absolute;z-index:450;left:55%;top:43%;transform:translate(-50%,-50%);padding:15px 23px;text-align:center;max-width:300px}.empty strong{font-size:13px}.empty p{font-size:12px;color:var(--muted);margin:5px 0 0}.hidden{display:none!important}.notice{position:absolute;z-index:460;right:75px;top:98px;background:var(--paper);padding:10px 14px;border-radius:8px;font-size:11px;max-width:240px}.popup{min-width:205px;max-width:260px}.popup h3{font-size:17px;margin:3px 0 5px}.popup p{margin:5px 0;font-size:12px}.popup .links{max-height:155px;overflow:auto;border-top:1px solid var(--line);padding-top:7px;margin-top:9px}.popup a{display:block;font-size:11px;padding:2px 0}.popup code{font-size:10px;color:var(--muted)}dialog{max-width:620px;width:calc(100% - 34px);border:1px solid var(--line);border-radius:16px;padding:28px;color:var(--ink);background:var(--paper);max-height:85vh}dialog::backdrop{background:#1c302b60}dialog h2{font:27px Georgia,serif;margin:0 0 15px}dialog p{font-size:13px;line-height:1.65}dialog .close{float:right}dialog dl{display:grid;grid-template-columns:1fr auto;gap:7px;font-size:12px}dialog dd{margin:0;font-variant-numeric:tabular-nums}#loading{position:absolute;z-index:900;inset:74px 0 0;display:grid;place-items:center;background:#f7f8f0;color:var(--green)}
+@media(max-width:1050px){header{padding:0 18px}.header-note{display:none}.sidebar{width:265px;left:16px;padding:17px}.date-badge{left:auto;right:75px;transform:none;min-width:195px}.key{right:16px}.timeline{left:16px;right:16px}h1{font-size:27px}}
+@media(max-width:700px){header{height:62px;padding:0 12px}.brand strong{font-size:15px}.brand small{font-size:8px}.brand .mark{width:32px;height:32px;font-size:19px}.top-actions{gap:4px}.top-actions button{font-size:10px;padding:7px}.top-actions .reset-label{display:none}#map{top:62px}.sidebar{top:73px;left:10px;right:10px;width:auto;padding:12px;border-radius:10px;display:grid;grid-template-columns:1fr 1fr;gap:7px 10px}.sidebar .eyebrow,.sidebar h1,.sidebar .intro,.sidebar .stat,.sidebar .precision-note{display:none}.sidebar .field{margin:0 0 4px;font-size:10px}.sidebar .detail-row{gap:8px}.sidebar .select{padding:6px 18px 6px 7px;font-size:11px}.segmented button{padding:6px 0;font-size:11px}.date-badge{top:244px;left:10px;right:auto;min-width:0;padding:8px 12px}.date-badge strong{font-size:16px}.date-badge small{font-size:9px}.leaflet-top.leaflet-right{top:181px;right:6px}.key{right:10px;bottom:215px;width:170px;padding:10px}.key strong{font-size:10px}.key p{font-size:9px}.ramp{margin-top:7px;height:10px}.ramp-labels{font-size:9px;margin-bottom:4px}.timeline{left:8px;right:8px;bottom:20px;padding:12px}.timeline-head{align-items:flex-start;gap:5px}.timeline-title strong{font-size:11px}.timeline-title small{font-size:10px}.playback{gap:3px}.playback label{display:none}.playback button{padding:7px;min-width:0;font-size:11px}.playback select{font-size:10px;max-width:50px}.chart{height:39px;margin-top:10px}.timeline-foot{font-size:9px}.timeline-foot span:last-child{max-width:50%;text-align:right}.leaflet-bottom.leaflet-right{bottom:196px}.empty{left:50%;top:51%}.notice{top:310px;right:10px;max-width:190px}#loading{top:62px}}
+.leaflet-tile-pane{filter:saturate(.28) contrast(.94);opacity:.84}.sidebar .stat{margin-top:12px;padding-top:11px}.sidebar .field{margin-top:12px}.sidebar{padding:20px}.sidebar h1{margin-top:9px;margin-bottom:9px}.sidebar .intro{margin-bottom:13px}
+@media(max-width:700px){.sidebar{padding:12px}.sidebar .field{margin-top:0}}
+</style>
+</head>
+<body>
+<header>
+  <div class="brand"><span class="mark" aria-hidden="true">❋</span><div><strong>Monarch atlas</strong><small>North America · Phenology</small></div></div>
+  <div class="top-actions"><span class="header-note">An annual rhythm, one week at a time.</span><button id="resetView">↗ <span class="reset-label">North America</span><span class="mobile-label"></span></button><button id="aboutButton">About the data</button></div>
+</header>
+<main>
+  <div id="map" aria-label="Interactive map of weekly monarch larva and pupa observations"></div>
+  <aside class="panel sidebar" aria-label="Map filters">
+    <div class="eyebrow">Before the butterfly</div><h1>Early stages.</h1>
+    <p class="intro">Human-annotated larvae and pupae.</p>
+    <div><label class="field" for="year">Time period</label><select class="select" id="year"><option value="all">All years · seasonal cycle</option></select></div>
+    <div><span class="field" id="stageLabel">Life stage</span><div class="segmented" role="group" aria-labelledby="stageLabel"><button data-stage="both" aria-pressed="true">Both</button><button data-stage="0" aria-pressed="false">Larvae</button><button data-stage="1" aria-pressed="false">Pupae</button></div></div>
+    <div><label class="field" for="resolution">Hexagon size</label><select class="select" id="resolution"><option value="7">Fine · H3 7 · ~5.2 km²</option><option value="8">Finer · H3 8 · ~0.74 km²</option></select></div>
+    <div><label class="field" for="accuracy">Location accuracy</label><select class="select" id="accuracy"><option value="standard">≤1 km or unstated</option><option value="precise">≤1 km only</option><option value="all">All public coordinates</option></select></div>
+    <p class="subtle precision-note">Zoom in to see individual hexagons.</p>
+    <div class="stat"><strong id="weekCount">…</strong><p>observations this week, across North America</p><div class="split"><span><b id="larvaCount">0</b> larvae</span><span><b id="pupaCount">0</b> pupae</span></div><p id="hexCount"></p></div>
+  </aside>
+  <div class="panel date-badge"><small id="periodLabel">All years pooled</small><strong id="dateLabel">Loading observations</strong></div>
+  <div class="panel key" aria-label="Color legend"><strong>Observations / hex / week</strong><div class="ramp" id="ramp"></div><div class="ramp-labels"><span>1</span><span>2–3</span><span>4–7</span><span>8–15</span><span>16–31</span><span>32+</span></div><p>Fixed scale throughout playback.<br>Counts reflect observation effort too.</p></div>
+  <div id="empty" class="panel empty hidden"><strong>No observations this week</strong><p>Advance the timeline or choose another year. No records does not mean no monarchs.</p></div>
+  <div id="tileNotice" class="notice hidden">The background map is unavailable. Hexagons and playback still work.</div>
+  <section class="panel timeline" aria-label="Weekly playback">
+    <div class="timeline-head"><div class="timeline-title"><strong id="timelineTitle">The seasonal cycle</strong><small id="timelineSubtitle">Loading the observation record</small></div><div class="playback"><button class="step" id="previous" aria-label="Previous week">←</button><button class="play" id="play" aria-label="Play weekly animation">▶ Play</button><button class="step" id="next" aria-label="Next week">→</button><label for="speed">Speed</label><select class="speed" id="speed" aria-label="Playback speed"><option value="1400">Slow</option><option value="750" selected>Normal</option><option value="350">Fast</option></select></div></div>
+    <div id="chart" class="chart" aria-label="Weekly observation totals"></div>
+    <input class="slider" id="week" aria-label="Week of year" type="range" min="0" max="52" value="0" step="1">
+    <div class="months"><span>Jan</span><span>Feb</span><span>Mar</span><span>Apr</span><span>May</span><span>Jun</span><span>Jul</span><span>Aug</span><span>Sep</span><span>Oct</span><span>Nov</span><span>Dec</span></div>
+    <div class="timeline-foot"><span id="weekNumber">Week 1 of 53</span><span id="coverage"></span></div>
+  </section>
+</main>
+<dialog id="about"><button class="close" id="closeAbout" aria-label="Close data information">✕</button><h2>Reading this map</h2><p id="sourceDescription"></p>
+  <p>Each hexagon counts unique observations, not individual caterpillars, pupae, photos, or butterflies. Repeat visits to the same animal can be separate observations. The color bins stay fixed across weeks, years, stage filters, and zoom levels. A darker hexagon means more records, not an estimate of population density.</p>
+  <p>Individual years use consecutive seven-day windows starting January 1, with a short final window. The pooled seasonal cycle aligns month and day on a leap-year calendar. The February 26 to March 3 bin has six days in non-leap years. Pooled counts are summed across years, not annual averages. Recent years have more observation effort, and the current year is incomplete.</p>
+  <p>Only unambiguous, undisputed iNaturalist Life Stage annotations are included. Eggs and adults are excluded. These are community annotations, not Jev predictions, and have not received a separate expert audit. A pupa label alone does not distinguish an occupied chrysalis from an empty one.</p>
+  <p>Obscured or private locations are excluded. The default excludes reported accuracy worse than 1 km but includes unstated accuracy. Choose “≤1 km only” to exclude those unstated locations too. Fine hexagons show the reported location, not certainty about its exact position. H3 8 cells are smaller than some location uncertainty circles.</p>
+  <dl id="sourceStats"></dl><p>Sources <a href="https://www.inaturalist.org/observations?taxon_id=48662&place_id=97394&term_id=1&term_value_id=4,6" target="_blank" rel="noopener">iNaturalist observations</a> and <a href="https://h3geo.org/docs/core-library/restable/" target="_blank" rel="noopener">H3 cell sizes</a>. Map tiles by OpenStreetMap contributors. Built locally without model calls.</p>
+</dialog>
+<div id="loading" role="status">Preparing the weekly atlas…</div>
+<script id="map-data" type="application/json">__MAP_DATA__</script>
+<script src="assets/leaflet.js"></script>
+<script>
+'use strict';
+try {
+const DATA = JSON.parse(document.getElementById('map-data').textContent);
+if(DATA.preview) document.querySelector('.header-note').textContent='Preview · full download still in progress';
+const $ = id => document.getElementById(id);
+const fmt = number => number.toLocaleString('en-US');
+const COLORS = ['#fff7bc','#fee391','#fec44f','#fe9929','#ec7014','#cc4c02'];
+const color = n => COLORS[n >= 32 ? 5 : n >= 16 ? 4 : n >= 8 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0];
+const years = Object.keys(DATA.stats.years).sort().reverse();
+const cutoffYear = Number(DATA.cutoff.slice(0,4));
+years.forEach(year => {const option = new Option(year + (Number(year) === cutoffYear ? ' · through ' + DATA.cutoff.slice(5) : ''), year);$('year').add(option);});
+const state = {year:'all', stage:'both', resolution:7, accuracy:'standard', week:0, frames:[], totals:[], selected:[], playing:false, timer:null};
+const map = L.map('map', {preferCanvas:true, zoomControl:false, minZoom:2, maxZoom:18, worldCopyJump:false});
+L.control.zoom({position:'topright'}).addTo(map);
+const renderer = L.canvas({padding:0.3});
+const polygons = L.layerGroup().addTo(map);
+const tiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {maxZoom:19,attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'}).addTo(map);
+let tileErrors = 0;
+tiles.on('tileerror', () => {if (++tileErrors > 4) $('tileNotice').classList.remove('hidden');});
+tiles.on('tileload', () => {tileErrors = 0;$('tileNotice').classList.add('hidden');});
+function resetView(){const mobile = innerWidth <= 700;map.fitBounds([[10,-130],[55,-53]],{paddingTopLeft:mobile?[15,180]:[340,65],paddingBottomRight:mobile?[20,230]:[50,225],animate:false});}
+resetView();
+$('resetView').onclick = resetView;
+COLORS.forEach(c => {const swatch=document.createElement('span');swatch.style.background=c;$('ramp').appendChild(swatch);});
+function windowDates(index){
+  const year = state.year === 'all' ? 2000 : Number(state.year);
+  const start = new Date(Date.UTC(year,0,1 + index*7));
+  const end = new Date(Math.min(Date.UTC(year,0,7 + index*7),Date.UTC(year,11,31)));
+  return [start,end];
+}
+function shortDate(date){return date.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
+function weekLabel(index){const [a,b]=windowDates(index);return shortDate(a)+' – '+shortDate(b);}
+function stop(){state.playing=false;clearInterval(state.timer);state.timer=null;$('play').textContent='▶ Play';$('play').setAttribute('aria-label','Play weekly animation');}
+function play(){state.playing=true;$('play').textContent='Ⅱ Pause';$('play').setAttribute('aria-label','Pause weekly animation');state.timer=setInterval(()=>setWeek((state.week+1)%state.frames.length),Number($('speed').value));}
+function popup(cellIndex, rows){
+  const larvae=rows.filter(r=>r[2]===0).length;
+  const unknown=rows.filter(r=>r[3]===null).length;
+  const coarse=rows.filter(r=>r[3]!==null&&r[3]>1000).length;
+  const links=rows.slice().sort((a,b)=>a[1].localeCompare(b[1])).map(r=>'<a target="_blank" rel="noopener" href="https://www.inaturalist.org/observations/'+r[0]+'">'+r[1]+' · '+(r[2]===0?'Larva':'Pupa')+' · #'+r[0]+'</a>').join('');
+  return '<div class="popup"><h3>'+fmt(rows.length)+' observations</h3><p>'+larvae+' larvae · '+(rows.length-larvae)+' pupae</p><p>'+weekLabel(state.week)+' · '+(state.year==='all'?'all years':state.year)+'</p><code>'+DATA.cells[cellIndex][0]+'</code><p>'+unknown+' unstated accuracy'+(coarse?' · '+coarse+' worse than 1 km':'')+'</p><div class="links">'+links+'</div></div>';
+}
+function setWeek(index){
+  state.week=Math.max(0,Math.min(state.frames.length-1,index));
+  $('week').value=state.week;map.closePopup();polygons.clearLayers();
+  const frame=state.frames[state.week];
+  const groups=new Map();let larvae=0;
+  for(const row of frame){const cell=row[state.resolution===7?4:5];if(!groups.has(cell))groups.set(cell,[]);groups.get(cell).push(row);if(row[2]===0)larvae++;}
+  for(const [cell,rows] of groups){L.polygon(DATA.cells[cell][1],{renderer,color:'#9a5d24',weight:1.2,opacity:0.9,fillColor:color(rows.length),fillOpacity:0.88}).bindPopup(()=>popup(cell,rows),{maxWidth:290,autoPanPaddingTopLeft:[innerWidth>700?340:15,130],autoPanPaddingBottomRight:[20,220]}).addTo(polygons);}
+  $('weekCount').textContent=fmt(frame.length);$('larvaCount').textContent=fmt(larvae);$('pupaCount').textContent=fmt(frame.length-larvae);$('hexCount').textContent=fmt(groups.size)+' occupied hexagons';
+  $('dateLabel').textContent=weekLabel(state.week);
+  $('periodLabel').textContent=state.year==='all'?'All years pooled':state.year+' · observed dates';
+  $('weekNumber').textContent='Week '+(state.week+1)+' of '+state.frames.length+' · '+fmt(frame.length)+' observations';
+  $('week').setAttribute('aria-valuetext',weekLabel(state.week));
+  document.querySelectorAll('.bar').forEach((bar,i)=>{bar.classList.toggle('active',i===state.week);bar.setAttribute('aria-pressed',i===state.week?'true':'false');});
+  $('empty').classList.toggle('hidden',frame.length>0);
+}
+function rebuild(){
+  stop();
+  state.selected=DATA.observations.filter(r=>(state.year==='all'||r[1].startsWith(state.year+'-'))&&(state.stage==='both'||r[2]===Number(state.stage))&&(state.accuracy==='all'||(r[3]!==null?r[3]<=1000:state.accuracy==='standard')));
+  let lastWeek=52;
+  if(state.year===String(cutoffYear)){const d=new Date(DATA.cutoff+'T00:00:00Z');lastWeek=Math.floor((d-Date.UTC(cutoffYear,0,1))/86400000/7);}
+  state.frames=Array.from({length:lastWeek+1},()=>[]);
+  state.selected.forEach(row=>{const index=row[state.year==='all'?7:6];if(index<state.frames.length)state.frames[index].push(row);});
+  state.totals=state.frames.map(rows=>rows.length);
+  $('week').max=lastWeek;
+  $('chart').replaceChildren();
+  const maximum=Math.max(1,...state.totals);
+  // Keep all 53 positions on the annual axis, even for an incomplete year.
+  for(let index=0;index<53;index++){
+    const count=state.totals[index]||0;
+    const bar=document.createElement('button');bar.className='bar';bar.style.height=Math.max(3,100*count/maximum)+'%';
+    bar.disabled=index>lastWeek;bar.title=weekLabel(index)+' · '+fmt(count)+' observations';bar.setAttribute('aria-label',bar.title);bar.onclick=()=>{stop();setWeek(index);};$('chart').appendChild(bar);
+  }
+  // Match the slider's physical length to the incomplete annual chart.
+  $('week').style.width=lastWeek===52?'100%':((lastWeek+1)/53*100)+'%';
+  const stageName=state.stage==='both'?'larva and pupa':state.stage==='0'?'larva':'pupa';
+  $('timelineTitle').textContent=state.year==='all'?'The seasonal cycle':state.year+' through the seasons';
+  $('timelineSubtitle').textContent=fmt(state.selected.length)+' '+stageName+' observations'+(state.year==='all'?' · pooled across '+years.length+' years':'');
+  const unknown=state.selected.filter(r=>r[3]===null).length;
+  $('coverage').textContent=fmt(unknown)+' with unstated accuracy · snapshot '+DATA.cutoff;
+  setWeek(state.week);
+}
+$('year').onchange=()=>{state.year=$('year').value;rebuild();};
+$('resolution').onchange=()=>{state.resolution=Number($('resolution').value);rebuild();};
+$('accuracy').onchange=()=>{state.accuracy=$('accuracy').value;rebuild();};
+document.querySelectorAll('[data-stage]').forEach(button=>button.onclick=()=>{state.stage=button.dataset.stage;document.querySelectorAll('[data-stage]').forEach(b=>b.setAttribute('aria-pressed',b===button?'true':'false'));rebuild();});
+$('week').oninput=()=>{stop();setWeek(Number($('week').value));};
+$('previous').onclick=()=>{stop();setWeek((state.week-1+state.frames.length)%state.frames.length);};
+$('next').onclick=()=>{stop();setWeek((state.week+1)%state.frames.length);};
+$('play').onclick=()=>state.playing?stop():play();
+$('speed').onchange=()=>{if(state.playing){stop();play();}};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+$('aboutButton').onclick=()=>{stop();$('about').showModal();};$('closeAbout').onclick=()=>$('about').close();
+$('sourceDescription').textContent=fmt(DATA.stats.downloaded)+' North American monarch observations with larva or pupa annotations were fetched from iNaturalist. '+fmt(DATA.stats.mapped)+' have an eligible annotation, date, and public location. The source spans '+DATA.stats.date_min+' to '+DATA.stats.date_max+'. The query includes photographs, excludes records marked captive, and includes all quality grades.';
+const summary=[['Fetched observations',DATA.stats.downloaded],['Eligible public locations',DATA.stats.mapped],['Obscured or private',DATA.stats.excluded.obscured_or_private||0],['Conflicting or disputed stages',DATA.stats.excluded.conflicting_or_disputed_stage||0],['Other excluded records',Object.entries(DATA.stats.excluded).filter(([k])=>!['obscured_or_private','conflicting_or_disputed_stage'].includes(k)).reduce((sum,[,v])=>sum+v,0)],['Reported accuracy worse than 1 km',DATA.stats.accuracy_over_1km],['Unstated accuracy',DATA.stats.unknown_accuracy]];
+summary.forEach(([label,n])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=fmt(n);$('sourceStats').append(dt,dd);});
+rebuild();$('loading').remove();
+} catch(error){document.getElementById('loading').textContent='The map could not load. Open it with the assets folder alongside index.html. '+error.message;console.error(error);}
+</script>
+</body>
+</html>

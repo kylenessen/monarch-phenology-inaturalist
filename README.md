@@ -115,7 +115,42 @@ The completed expansion has 594 complete 14-day windows for all seven weather va
 
 Validation includes 54 Python tests and a Chromium browser check of presets, metric choices, cumulative distributions, filtering, empty selections, individual daily charts, CSV download, and a 390-pixel mobile viewport. No browser script errors were observed. Median summaries reduce the influence of individual extremes but do not correct model errors, observer bias, seasonal confounding, or missing land cover.
 
-### Full Daymet archive without AET
+### Active full seven-day point run
+
+The active full run uses point lookups and retrieves only D−7 through D−1 for each eligible observation. It includes all seven daily Daymet variables, seven-day summaries, exact-year USGS land-cover categories, and the developed/natural/agriculture grouping. It does not invoke the full-year archive command below. The existing 600-observation explorer remains available while the full run progresses.
+
+```sh
+uv run python -m monarch_phenology.weather_full
+uv run python -m monarch_phenology.weather_full --plan-only
+uv run python -m monarch_phenology.weather_full --retry-errors
+uv run python -m monarch_phenology.weather_full --export-only
+```
+
+The output directory is `runs/weather-full-7d`. [The local progress page](http://127.0.0.1:8770/) refreshes every 15 seconds and displays retrieval progress, partial habitat counts, and storage use. The background downloader was started with `caffeinate -i` to prevent idle system sleep while it runs. It needs this Mac and its network connection to remain available. Progress is checkpointed after each result. The same command resumes after an interruption. An exclusive run lock prevents competing downloaders from writing the same directory. The progress server can be restarted with `uv run python -m http.server 8770 --bind 127.0.0.1 --directory runs/weather-full-7d`.
+
+The November 2 plan retains 113,634 public, unambiguous larva/pupa observations under the atlas filter. This includes 19,850 with unknown coordinate uncertainty, explicitly identified. It excludes 7,808 with uncertainty above 1 km, 15,439 obscured/private observations, and four disputed stage annotations. Seven-day weather dates are eligible for 98,339 records. Land-cover years are eligible for 98,326. The remaining records are retained with unavailable-year statuses rather than dropped. A January 1, 2026 observation can still have a valid weather window entirely in 2025, although its 2026 land-cover year is unavailable. Land-cover geographic coverage is determined by the point service, with NoData preserved.
+
+There are 95,167 distinct weather requests and 93,238 distinct coordinate/year land-cover requests before cache reuse. The pilot supplied 595 reusable weather requests and 598 land-cover requests. Duplicate coordinates and identical requested periods share a result. Each provider has four workers with a shared minimum interval of one second between requests. Throttling and service retry instructions defer subsequent requests to that provider. Transient failures are retried, then recorded for an explicit `--retry-errors` pass. At this pacing, the download has a lower bound of about 26 hours before slower responses, retries, and interruptions. The 60-request live smoke test completed successfully before the unrestricted background run started.
+
+`observations.sqlite` is the authoritative archive. `observations` stores IDs, dates, stages, coordinates, location uncertainty, human alive/dead annotations, and links to enrichment requests. `weather_daily` stores all seven daily variables once per exact coordinate and date. `weather_summaries` stores seven-day metrics once per unique request. `landcover_results` stores original categories and simplified habitat groups. `requests` contains parameters, result status, attempt count, retrieval time, compressed original responses, error details, and cache provenance. `metadata` records configuration, source fingerprint, product information, units, and pipeline fingerprint. `excluded_observations` records excluded IDs and reasons. `enriched_observations` is a convenient joined SQL view. No sampling weights are needed for this full census of the retained atlas records.
+
+The daily weather units are degrees Celsius for minimum and maximum temperature, millimeters per day for precipitation, pascals for vapor pressure, watts per square meter averaged over daylight for radiation, kilograms per square meter for snow water equivalent, and seconds per day for daylight duration. Temperature summaries use Celsius. Snow and rain zeros remain valid. Missing values and omitted leap-year dates are not interpolated. Metrics require all seven constituent dates. Original pilot responses can contain 14 days, but only the seven requested days are inserted into this run's daily table and summaries. Original cached response provenance is retained.
+
+The downloader creates `observations.csv.gz` and `weather-daily.csv.gz` at the end of an invocation. The progress page states when a CSV snapshot was generated. These snapshots are not updated after each observation. `--export-only` regenerates them when no downloader owns the directory. SQLite uses a write-ahead journal while active. Use a read-only SQLite connection for live analysis and the SQLite backup API for a consistent live backup. Do not copy only the main database file while a writer is active. Closing the downloader checkpoints committed data. The directory is excluded from Git, so code commits are not data backups.
+
+For daily weather aligned to individual observations, join on `point_key` and restrict dates to the observation's own window. This preserves separate observations that share a location while avoiding duplicated weather storage.
+
+```sql
+SELECT o.id, o.observed_on, d.*
+FROM observations AS o
+JOIN weather_daily AS d ON d.point_key = o.point_key
+WHERE d.date >= date(o.observed_on, '-7 days')
+  AND d.date < o.observed_on;
+```
+
+At most 688,373 daily observation-date records are needed before deduplicating overlapping locations and windows. This is about 50 times fewer than the earlier full-year plan. The actual daily table will be smaller. The storage estimate is hundreds of megabytes for the structured archive, rather than continental raster volumes. The starting SQLite file, which includes the complete request plan, is approximately 192 MiB. Final size depends on responses and SQLite allocation. The implementation passed 56 Python tests and a desktop/mobile progress-page browser check.
+
+### Earlier full-year Daymet archive prototype
 
 The new archive collects all seven Daymet variables together in one request per exact coordinate. These are daily minimum and maximum temperature, precipitation, vapor pressure, shortwave radiation, snow water equivalent, and day length. The [Daymet service](https://daymet.ornl.gov/web_services) supports multiple years in the same request. The archive saves complete required years, original CSV responses, metadata including elevation and software version, and parsed daily values with units. Repeated coordinates share a request. Coordinates are not rounded or merged using approximate grid cells. No MODIS, AET, Jev, or ERA5 requests are made by this command.
 

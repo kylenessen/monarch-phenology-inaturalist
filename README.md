@@ -61,6 +61,8 @@ The source query includes all quality grades and photo observations not marked c
 
 Use `--build-only` to regenerate the page from a completed cache. Use a different `--output` directory for a fresh snapshot. `--fetch-only` downloads metadata without building. `--build-only --preview` builds an explicitly marked partial preview during a download. A normal build refuses incomplete downloads. The HTML embeds its dataset and uses adjacent, versioned Leaflet and H3 assets. Only the OpenStreetMap background tiles need a network connection during viewing. Source pages, query parameters, fetch dates, and exclusion counts remain in the output directory for auditing.
 
+The November 2, 2026 snapshot fetched 136,885 observations. It retained 121,442 after excluding 15,439 obscured or private locations and four conflicting or disputed stage annotations. The retained dataset contains 109,163 larvae and 12,279 pupae across 43 represented years. The default accuracy filter displays 113,634 observations. Another 7,808 have reported uncertainty greater than 1 km. Of the retained observations, 19,850 have unstated accuracy. These totals describe observation records, not independently verified animals.
+
 Early development. Project structure and data pipeline under construction.
 
 ## License

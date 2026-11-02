@@ -35,3 +35,21 @@ iNaturalist annotations belong to observations, not individual photos. Some obse
 Photo licenses and attribution are retained without filtering, consistent with this repository's build-mode policy. Cached photos and credentials stay out of Git. iNaturalist queries follow its [API guidance](https://www.inaturalist.org/pages/developers) with at least a second between metadata requests and bounded retries for transient failures.
 
 Run the offline checks with `uv run pytest -q`. They cover disputed labels, image limits, request metadata isolation, malformed responses, metric denominators, transient retries and resume behavior.
+
+## Review photos in a browser
+
+Build the local review page after the benchmark finishes.
+
+```sh
+uv run python -m monarch_phenology.review_jev
+```
+
+Open `runs/jev-pilot/review.html` in a browser. Keep it beside the existing `images` folder. The page embeds the review metadata and uses cached photos, so it needs no API key or network connection. For a different benchmark folder, pass `--run-dir` to the generator.
+
+The initial view shows the main label disagreements. Filters also expose all flagged photos, independent-question disagreements and low-confidence classifications. Select the stage visible in each photo, or choose multiple stages, cannot tell or no monarch visible. Notes and selections save as browser-local drafts. Save & next marks a photo reviewed. Corrections stay separate from the benchmark labels and do not update iNaturalist.
+
+Export CSV for analysis or JSON for a portable backup. JSON reviews can be imported into the same benchmark page, retaining the newer edit when both copies have a review. Export before switching browsers, moving the page or clearing browser data. Local file storage support varies by browser. If needed, serve only the run folder and open `http://127.0.0.1:8766/review.html`.
+
+```sh
+uv run python -m http.server 8766 --bind 127.0.0.1 --directory runs/jev-pilot
+```

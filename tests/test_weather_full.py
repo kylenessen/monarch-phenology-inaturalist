@@ -81,3 +81,17 @@ def test_shared_cooldown_and_independent_provider_pacing(monkeypatch):
         assert t.effective['daymet']==pytest.approx(.9)
         assert t.snapshot()['daymet']['http_responses']=={'429':1,'200':100,'500':3}
     finally:t.client.close()
+
+
+def test_restart_retains_adaptive_backoff_but_allows_faster_target():
+    from datetime import datetime, timezone
+    from monarch_phenology.weather_full import Transport
+    t=Transport(.125)
+    try:
+        t.restore_backoff({'updated_at':datetime.now(timezone.utc).isoformat(),'transport':{
+            'daymet':{'target_interval_seconds':.25,'effective_interval_seconds':1.,'cooldown_seconds':60},
+            'landcover':{'target_interval_seconds':.25,'effective_interval_seconds':.25,'cooldown_seconds':0}}})
+        assert t.effective['daymet']==1
+        assert t.snapshot()['daymet']['cooldown_seconds']>58
+        assert t.effective['landcover']==.125
+    finally:t.client.close()

@@ -258,6 +258,23 @@ class Transport:
                 result[service]={'target_interval_seconds':self.interval,'effective_interval_seconds':self.effective[service],'http_responses':dict(self.codes[service]),'cooldown_seconds':max(0,self.next[service]-time.monotonic())}
         return result
 
+    def restore_backoff(self, checkpoint):
+        """A restart must not bypass a provider's outstanding cooldown."""
+        updated=checkpoint.get('updated_at')
+        if not updated:
+            return
+        age=max(0,(datetime.now(timezone.utc)-datetime.fromisoformat(updated)).total_seconds())
+        for service,previous in checkpoint.get('transport',{}).items():
+            if service not in self.locks:
+                continue
+            old_target=previous.get('target_interval_seconds',self.interval)
+            old_effective=previous.get('effective_interval_seconds',old_target)
+            # Preserve adaptive slowdowns, but do not carry over an old, slower target.
+            if old_effective>old_target:
+                self.effective[service]=max(self.interval,old_effective)
+                remaining=max(0,previous.get('cooldown_seconds',0)-age)
+                self.next[service]=time.monotonic()+remaining
+
     def fetch(self, job):
         service=job['service'];params=json.loads(job['params']);body=None;code=None
         for attempt in range(4):
@@ -312,6 +329,9 @@ def run(db,output,workers,interval,limit=None):
     with db:
         db.execute("UPDATE requests SET status='pending' WHERE status='running'")
     transport=Transport(interval)
+    checkpoint=output/'status.json'
+    if checkpoint.exists():
+        transport.restore_backoff(json.loads(checkpoint.read_text()))
     started=time.monotonic()
     completed_by_service=Counter()
     with db:
@@ -361,7 +381,7 @@ def main():
     p.add_argument('--workers',type=int,default=4,help='Concurrent workers per provider')
     p.add_argument('--interval',type=float,default=1.0,help='Minimum seconds between requests per provider')
     args=p.parse_args()
-    if args.workers<1 or args.interval<0.25 or (args.limit is not None and args.limit<1):p.error('Invalid worker count, pacing or limit')
+    if args.workers<1 or args.interval<0.125 or (args.limit is not None and args.limit<1):p.error('Invalid worker count, pacing or limit')
     args.output.mkdir(parents=True,exist_ok=True)
     with (args.output/'run.lock').open('w') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

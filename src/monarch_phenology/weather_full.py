@@ -228,6 +228,7 @@ class Transport:
         self.codes={s:Counter() for s in self.locks}
         self.successes={s:0 for s in self.locks}
         self.failures={s:0 for s in self.locks}
+        self.backoff_until={s:0.0 for s in self.locks}
         self.client=httpx.Client(timeout=90,follow_redirects=True,limits=httpx.Limits(max_connections=128,max_keepalive_connections=128),headers={'User-Agent':'monarch-phenology/0.1 (cached research point extraction)'})
 
     def wait_turn(self, service):
@@ -251,8 +252,13 @@ class Transport:
             self.codes[service][str(code)]+=1
             self.failures[service]=self.failures[service]+1 if code>=500 or transient else 0
             if code in (429,503) or self.failures[service]>=3:
-                self.effective[service]=min(10,max(self.interval,self.effective[service]*2))
-                self.next[service]=max(self.next[service],time.monotonic()+max(5,delay))
+                current=time.monotonic()
+                # Responses already in flight belong to the same failure burst.
+                # Extend their cooldown, but only increase spacing once per burst.
+                if current>=self.backoff_until[service]:
+                    self.effective[service]=min(10,max(self.interval,self.effective[service]*2))
+                self.backoff_until[service]=max(self.backoff_until[service],current+max(5,delay))
+                self.next[service]=max(self.next[service],self.backoff_until[service])
                 self.successes[service]=0
                 self.failures[service]=0
             elif code==200:
@@ -284,6 +290,7 @@ class Transport:
                 self.effective[service]=max(self.interval,old_effective)
                 remaining=max(0,previous.get('cooldown_seconds',0)-age)
                 self.next[service]=time.monotonic()+remaining
+                self.backoff_until[service]=self.next[service]
 
     def fetch(self, job):
         service=job['service'];params=json.loads(job['params']);body=None;code=None

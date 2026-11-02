@@ -120,3 +120,22 @@ def test_known_usgs_route_outage_retries_and_backs_off(monkeypatch):
         assert result['status']=='request_error'
         assert result['attempts']==1
     finally:t.client.close()
+
+
+def test_inflight_error_burst_does_not_multiply_backoff(monkeypatch):
+    from monarch_phenology.weather_full import Transport
+    clock=[100.0]
+    monkeypatch.setattr('monarch_phenology.weather_full.time.monotonic',lambda:clock[0])
+    t=Transport(1/64)
+    try:
+        for _ in range(63):t.record_response('daymet',500)
+        assert t.effective['daymet']==1/32
+        assert t.snapshot()['daymet']['cooldown_seconds']==5
+        # Retry-After from a later in-flight response still extends the pause.
+        t.record_response('daymet',429,'60')
+        assert t.effective['daymet']==1/32
+        assert t.snapshot()['daymet']['cooldown_seconds']==60
+        clock[0]=161
+        for _ in range(3):t.record_response('daymet',500)
+        assert t.effective['daymet']==1/16
+    finally:t.client.close()

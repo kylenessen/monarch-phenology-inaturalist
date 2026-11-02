@@ -90,7 +90,9 @@ The optional audit joins existing alive/dead annotations and checks extreme Daym
 
 ### Expanded weather and land-cover explorer
 
-Open [the expanded explorer](http://127.0.0.1:8769/) for the same fixed 600-observation sample with all seven Daymet variables and year-matched USGS land cover. AET is omitted. The default axes show the median daily minimum and median daily maximum over the preceding 14 days. These are medians across the daily weather values for each observation, not medians across observations. The observed day is excluded. A seven-day alternative uses the same cached daily data.
+Open [the expanded explorer](http://127.0.0.1:8769/) for the same fixed 600-observation sample with all seven Daymet variables and year-matched USGS land cover. AET is omitted. The default axes show the median daily minimum and median daily maximum over the preceding 14 days, grouped by developed versus natural cover. These are medians across the daily weather values for each observation, not medians across observations. The observed day is excluded. A seven-day alternative uses the same cached daily data.
+
+The simple habitat comparison combines all four developed classes, NLCD codes 21 through 24, including developed open space such as lawns and parks. Natural cover combines the recognized forest, shrub, grassland, wetland, water, snow, and barren classes. Pasture/hay and cultivated crops remain Agriculture, not natural cover. Missing categories remain Unavailable. The initial comparison displays 364 developed and 96 natural-cover observations. The habitat filter can include the 40 agricultural and 100 unavailable records, or show any group alone. Summary counts respect the other filters and explicitly show what the habitat filter excludes. Percentages use the selected sampling weighting or raw counts, with only developed and natural cover in their denominator. These describe mapped observation locations, not habitat availability or preference. Original categories remain available, and the summary and filtered CSV exports include `habitat_group`.
 
 ```sh
 uv run python -m monarch_phenology.weather_expand

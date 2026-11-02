@@ -15,6 +15,19 @@ from .weather_report import COLORS
 from .weather_expand import summarize_window
 from .daymet_archive import VARIABLES
 
+
+def habitat_group(row: dict) -> str:
+    if row.get('landcover_status') != 'ok':
+        return 'Unavailable'
+    code=row.get('landcover_code')
+    if code in (21,22,23,24):
+        return 'Developed'
+    if code in (81,82):
+        return 'Agriculture'
+    if code in (11,12,31,41,42,43,52,71,90,95):
+        return 'Natural cover'
+    return 'Unavailable'
+
 # key, display label, unit, definition
 METRICS = [
     ('tmin_median','Median daily minimum','temp','Median of daily minimum temperatures in the preceding window.'),
@@ -65,6 +78,7 @@ def build(output: Path, preview: bool = False) -> Path:
         row.update(json.loads(lc.read_text()) if lc.exists() else {'landcover_status':'pending'})
         row.update(audit['records'].get(str(row['id']),{}))
         row.setdefault('landcover_label','Unavailable')
+        row['habitat_group']=habitat_group(row)
         row.setdefault('human_alive_status','not_audited')
         row.setdefault('temperature_audit_flag','not_checked')
         observed=date.fromisoformat(row['date'])
@@ -80,9 +94,11 @@ def build(output: Path, preview: bool = False) -> Path:
             response.raise_for_status()
             (assets/name).write_bytes(response.content)
     summary={'sample_size':len(rows),'eligible_population':manifest['eligible_population'],'built_at':datetime.now(timezone.utc).isoformat(),'pending':len(missing),'weather':dict(Counter(r['daymet_status'] for r in rows)),'landcover':dict(Counter(r['landcover_status'] for r in rows)),'landcover_classes':dict(Counter(r['landcover_label'] for r in rows))}
+    summary['habitat_groups']=dict(Counter(r['habitat_group'] for r in rows))
     write_json(output/'expanded-summary.json',summary)
     flat=[]
     fields=['id','date','stage','region','season','lat','lon','accuracy','sampling_weight','daymet_status','temperature_source','landcover_status','landcover_year','landcover_code','landcover_label','landcover_resolution_m','landcover_product','landcover_source','human_alive_status','temperature_audit_flag','era5_tmin_14d_c','era5_tmax_14d_c']
+    fields.append('habitat_group')
     for row in rows:
         record={k:row.get(k) for k in fields}
         for window in ('7','14'):

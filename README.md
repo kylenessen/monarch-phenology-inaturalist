@@ -88,6 +88,24 @@ The completed pilot has 595 complete temperature windows and 311 usable AET wind
 
 The optional audit joins existing alive/dead annotations and checks extreme Daymet windows against ERA5-Land through Open-Meteo at about 9 km. It checks windows reaching freezing, 100 degrees Fahrenheit, or a daily temperature range of at least 40 degrees Celsius. The pilot has three records annotated dead, including the coldest pupa record. Of 26 weather windows cross-checked, one has a minimum or maximum differing by at least 10 degrees Celsius. Observation 180392679 has a Daymet minimum of -9.12 degrees Celsius and an ERA5-Land minimum of 12.4 degrees Celsius for the same dates. This is flagged for review. Original values remain unchanged, and the interactive report can exclude known-dead records or large weather disagreements. The screening rule is exploratory, not a validated error cutoff. The remaining 574 temperature windows were not independently cross-checked.
 
+### Full Daymet archive without AET
+
+The new archive collects all seven Daymet variables together in one request per exact coordinate. These are daily minimum and maximum temperature, precipitation, vapor pressure, shortwave radiation, snow water equivalent, and day length. The [Daymet service](https://daymet.ornl.gov/web_services) supports multiple years in the same request. The archive saves complete required years, original CSV responses, metadata including elevation and software version, and parsed daily values with units. Repeated coordinates share a request. Coordinates are not rounded or merged using approximate grid cells. No MODIS, AET, Jev, or ERA5 requests are made by this command.
+
+```sh
+uv run python -m monarch_phenology.daymet_archive
+uv run python -m monarch_phenology.daymet_archive --fetch --limit 3
+uv run python -m monarch_phenology.daymet_archive --fetch
+```
+
+The first command prepares an offline plan. The second tests three pending requests. The third downloads all pending points. Results resume under `runs/daymet-full`, and `--retry-errors` retries saved request failures. The default four workers share the existing Daymet request pacing and retry logic. Keep the original pilot directory separate. Its completed AET results remain historical and its older command still requests AET.
+
+The default archive follows the atlas accuracy filter, retaining public coordinates with reported uncertainty no greater than 1 km or unstated uncertainty. Unknown accuracy remains identifiable for sensitivity filters. `--strict-accuracy` removes it. The year cutoff defaults to 2025, the latest completed year used for this analysis. The old 2001 MODIS restriction no longer applies. Observations must have a full 60-day lookback within Daymet's 1980 onward coverage. Required preceding years are downloaded as well, allowing later 7, 14, 30, and 60-day analyses without new requests. Complete observation years include dates after the observation. Subsequent antecedent analyses must select only dates before it. Geographic coverage is evaluated during download. A planned observation does not guarantee usable weather data.
+
+The November 2 plan contains 98,327 observations, including 17,097 with unknown accuracy, at 92,620 exact coordinates across 95,276 coordinate-year combinations. Counts exclude 16,153 records outside the selected dates or lookback, 6,962 with uncertainty over 1 km, 15,439 private or obscured records, and four disputed stage annotations. Exclusions are sequential. Three live point requests passed with all seven variables and complete requested Daymet years. The large download has not been started.
+
+Daymet's [variable definitions](https://daymet.ornl.gov/overview) distinguish actual vapor pressure in pascals from relative humidity or vapor pressure deficit. Shortwave radiation is a daylight average in watts per square meter. Multiplying by day length in seconds and dividing by one million gives daily megajoules per square meter. Vapor pressure, radiation, and snowpack are modeled using the primary temperature and precipitation inputs, so they are not independent measurements. Missing values remain null. Daymet's missing leap-year December 31 is not interpolated. Daily data will support rainfall totals, wet-day counts, day-length summaries, and temperature accumulation without additional service calls, but biological thresholds still require a separate analysis choice.
+
 Early development. Project structure and data pipeline under construction.
 
 ## License

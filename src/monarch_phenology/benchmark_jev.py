@@ -210,15 +210,27 @@ def evaluate(samples: list[dict], results: dict, threshold: float) -> dict:
 def save_reports(output: Path, manifest: dict, results: dict, threshold: float) -> dict:
     summary = evaluate(manifest["samples"], results, threshold)
     write_json(output / "summary.json", summary)
-    fields = ["observation_id", "photo_id", "expected_stage", "prediction", "status", "confidence", "observation_url", "image_path", "error"]
+    fields = ["observation_id", "photo_id", "expected_stage", "prediction", "status", "confidence", "observation_url", "image_path", "error", "review_reasons"]
     fields += [f"p_{s}" for s in STAGES]
     rows = []
     for sample in manifest["samples"]:
         result = results.get(str(sample["photo_id"]), {"status": "pending"})
         row = {key: {**sample, **result}.get(key) for key in fields}
         row.update({f"p_{s}": result.get("stage_probabilities", {}).get(s) for s in STAGES})
+        reasons = []
+        if result["status"] != "ok":
+            reasons.append(result["status"])
+        else:
+            if result["prediction"] != sample["expected_stage"]:
+                reasons.append("choice_disagrees")
+            if result["confidence"] < 0.7:
+                reasons.append("low_choice_confidence")
+            detected = {s for s in STAGES if result["stage_probabilities"][s] >= threshold}
+            if detected != {sample["expected_stage"]}:
+                reasons.append("independent_questions_disagree")
+        row["review_reasons"] = ", ".join(reasons)
         rows.append(row)
-    for name, selected in [("predictions.csv", rows), ("review.csv", [r for r in rows if r["status"] != "ok" or r["prediction"] != r["expected_stage"] or r["confidence"] < 0.7])]:
+    for name, selected in [("predictions.csv", rows), ("review.csv", [r for r in rows if r["review_reasons"]])]:
         with (output / name).open("w", newline="") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields)
             writer.writeheader()
@@ -254,7 +266,10 @@ def run_benchmark(args: argparse.Namespace, manifest: dict) -> dict:
             start = time.monotonic()
             try:
                 result = classify_image(client, (args.output / sample["image_path"]).read_bytes(), args.model)
-                results[key] = {"status": "ok", **result, "seconds": time.monotonic() - start}
+                results[key] = {
+                    "status": "ok", **result, "seconds": time.monotonic() - start,
+                    "classified_at": datetime.now(timezone.utc).isoformat(),
+                }
             except (httpx.HTTPError, ValueError, KeyError, TypeError) as exc:
                 results[key] = {"status": "error", "error": str(exc)}
                 write_json(path, run)

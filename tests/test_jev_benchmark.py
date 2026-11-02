@@ -1,12 +1,13 @@
 import io
 import json
+import csv
 from types import SimpleNamespace
 
 import httpx
 from PIL import Image
 import pytest
 
-from monarch_phenology.benchmark_jev import annotation_stage, evaluate, run_benchmark
+from monarch_phenology.benchmark_jev import annotation_stage, evaluate, run_benchmark, save_reports
 from monarch_phenology.jev_client import (
     DESCRIPTIONS, STAGES, classify_image, parse_response, prepare_image, request_with_retry,
 )
@@ -117,3 +118,13 @@ def test_resume_skips_success_and_refuses_changed_model(tmp_path, monkeypatch):
     args.model = "other"
     with pytest.raises(ValueError, match="changed"):
         run_benchmark(args, manifest)
+
+
+def test_review_includes_independent_disagreement_even_when_choice_is_correct(tmp_path):
+    result = {"status": "ok", **parse_response(response_for("egg"))}
+    result["stage_probabilities"]["adult"] = 0.8
+    save_reports(tmp_path, {"samples": [{"photo_id": 1, "expected_stage": "egg"}]}, {"1": result}, 0.5)
+    with (tmp_path / "review.csv").open() as handle:
+        rows = list(csv.DictReader(handle))
+    assert len(rows) == 1
+    assert rows[0]["review_reasons"] == "independent_questions_disagree"

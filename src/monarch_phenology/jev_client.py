@@ -202,6 +202,9 @@ def parse_response(raw: dict[str, Any], prompt_version: str = "v1") -> dict[str,
             raise ValueError("Invalid larval development distribution")
         parsed.update(larval_development=larval["choice"], larval_development_confidence=probability(larval["confidence"]),
                       larval_development_probabilities=distribution)
+        # Keep raw answers for auditing. Only organism-visible images enter a provisional live-stage series.
+        parsed["phenology_stage"] = parsed["prediction"] if parsed["evidence"] == "monarch_visible" and parsed["prediction"] in STAGES else None
+        parsed["phenology_larval_development"] = parsed["larval_development"] if parsed["phenology_stage"] == "larva" and parsed["larval_development"] in {"small_early", "large_late"} else None
     return parsed
 
 

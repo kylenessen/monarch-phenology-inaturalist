@@ -36,6 +36,18 @@ Photo licenses and attribution are retained without filtering, consistent with t
 
 Run the offline checks with `uv run pytest -q`. They cover disputed labels, image limits, request metadata isolation, malformed responses, metric denominators, transient retries and resume behavior.
 
+## Expanded phenology pilot
+
+The `v2` prompt adds evidence type, empty chrysalis, no obvious monarch, dead remains, clustering, nectaring and coarse larval development. Small/early and large/late are broad visual groups. Intermediate or unclear larvae are kept uncertain. These labels have no photo-level ground truth in the life stage annotations and require manual review. Clustering and nectaring are independent tags that can coexist with adult stage. Empty casings are distinct from dead remains and occupied pupae.
+
+To repeat the second pilot, use the following command. Prior observations, photo IDs and identical prepared images are excluded. The original v1 prompt and results remain available.
+
+```sh
+uv run python -m monarch_phenology.benchmark_jev --prompt-version v2 --seed 43 --exclude-run runs/jev-pilot --exclude-run runs/jev-smoke --output runs/jev-pilot-v2
+```
+
+The expanded [second pilot report](JEV_PILOT_V2_RESULTS.md) explains label definitions, uncertainty thresholds, derived phenology fields and results. The stricter derived fields retain the raw model answers for auditing and exclude images with only remains or no identifiable organism from provisional living-stage counts.
+
 ## Review photos in a browser
 
 Build the local review page after the benchmark finishes.
@@ -53,3 +65,12 @@ Export CSV for analysis or JSON for a portable backup. JSON reviews can be impor
 ```sh
 uv run python -m http.server 8766 --bind 127.0.0.1 --directory runs/jev-pilot
 ```
+
+For the larger second review, include all 400 photos and link the adjacent images for faster loading. The local server must stay running while this page is in use.
+
+```sh
+uv run python -m monarch_phenology.review_jev --run-dir runs/jev-pilot-v2 --all-photos --linked-images
+uv run python -m http.server 8767 --bind 127.0.0.1 --directory runs/jev-pilot-v2
+```
+
+Open `http://127.0.0.1:8767/review.html`. The Focus menu selects positive and uncertain tag predictions or visible-larva development predictions. Stage filters refer to the iNaturalist annotation. All photos includes negatives for auditing. Additional manual labels default to Not reviewed and export alongside the main review label. Omit `--linked-images` to produce a larger self-contained HTML file instead.

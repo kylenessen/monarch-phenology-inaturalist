@@ -220,6 +220,7 @@ def save_reports(output: Path, manifest: dict, results: dict, threshold: float) 
     summary = evaluate(manifest["samples"], results, threshold)
     extended = [r for r in results.values() if r.get("status") == "ok" and "extra_probabilities" in r]
     if extended:
+        summary["phenology_stage_counts"] = {stage: sum(r.get("phenology_stage") == stage for r in extended) for stage in [*STAGES, None]}
         summary["larval_development_counts"] = {label: sum(r["larval_development"] == label for r in extended) for label in {r["larval_development"] for r in extended}}
         summary["evidence_counts"] = {label: sum(r["evidence"] == label for r in extended) for label in {r["evidence"] for r in extended}}
         summary["extra_labels"] = {
@@ -233,7 +234,7 @@ def save_reports(output: Path, manifest: dict, results: dict, threshold: float) 
     fields = ["observation_id", "photo_id", "expected_stage", "prediction", "status", "confidence", "observation_url", "image_path", "error", "review_reasons"]
     fields += [f"p_{s}" for s in STAGES]
     if extended:
-        fields += ["evidence", "evidence_confidence", "larval_development", "larval_development_confidence", *[f"p_{label}" for label in EXTRA_LABELS]]
+        fields += ["evidence", "evidence_confidence", "larval_development", "larval_development_confidence", "phenology_stage", "phenology_larval_development", *[f"p_{label}" for label in EXTRA_LABELS]]
     rows = []
     for sample in manifest["samples"]:
         result = results.get(str(sample["photo_id"]), {"status": "pending"})
@@ -263,6 +264,8 @@ def save_reports(output: Path, manifest: dict, results: dict, threshold: float) 
                     reasons.append("extra_label_uncertain")
                 if (result["extra_probabilities"]["clustering"] >= 0.7 or result["extra_probabilities"]["nectaring"] >= 0.7) and result["prediction"] != "adult":
                     reasons.append("behavior_stage_conflict")
+                if result["evidence"] in {"empty_chrysalis_only", "no_obvious_monarch"} and result["prediction"] != "unknown":
+                    reasons.append("evidence_stage_conflict")
         row["review_reasons"] = ", ".join(reasons)
         rows.append(row)
     for name, selected in [("predictions.csv", rows), ("review.csv", [r for r in rows if r["review_reasons"]])]:

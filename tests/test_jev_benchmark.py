@@ -166,6 +166,16 @@ def test_empty_chrysalis_and_dead_remains_are_independent():
     assert "larval_development" not in get_questions("v1")
 
 
+def test_empty_case_does_not_enter_the_live_pupa_series():
+    raw = extended_response("pupa")
+    raw["answers"]["evidence"]["choice"] = "empty_chrysalis_only"
+    raw["answers"]["evidence"]["probabilities"] = {s: float(s == "empty_chrysalis_only") for s in EVIDENCE_OPTIONS}
+    result = parse_response(raw, "v2")
+    assert result["prediction"] == "pupa"
+    assert result["phenology_stage"] is None
+    assert result["phenology_larval_development"] is None
+
+
 def test_v2_requires_valid_extra_answers():
     raw = extended_response()
     raw["answers"]["larval_development"]["probabilities"]["small_early"] = float("nan")

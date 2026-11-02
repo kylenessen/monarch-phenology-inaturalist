@@ -381,7 +381,7 @@ def main():
     p.add_argument('--workers',type=int,default=4,help='Concurrent workers per provider')
     p.add_argument('--interval',type=float,default=1.0,help='Minimum seconds between requests per provider')
     args=p.parse_args()
-    if args.workers<1 or args.interval<0.125 or (args.limit is not None and args.limit<1):p.error('Invalid worker count, pacing or limit')
+    if args.workers<1 or args.interval<0.0625 or (args.limit is not None and args.limit<1):p.error('Invalid worker count, pacing or limit')
     args.output.mkdir(parents=True,exist_ok=True)
     with (args.output/'run.lock').open('w') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

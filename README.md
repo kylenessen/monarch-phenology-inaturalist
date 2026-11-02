@@ -120,9 +120,9 @@ Validation includes 54 Python tests and a Chromium browser check of presets, met
 The active full run uses point lookups and retrieves only D−7 through D−1 for each eligible observation. It includes all seven daily Daymet variables, seven-day summaries, exact-year USGS land-cover categories, and the developed/natural/agriculture grouping. It does not invoke the full-year archive command below. The existing 600-observation explorer remains available while the full run progresses.
 
 ```sh
-uv run python -m monarch_phenology.weather_full
+uv run python -m monarch_phenology.weather_full --interval 0.25
 uv run python -m monarch_phenology.weather_full --plan-only
-uv run python -m monarch_phenology.weather_full --retry-errors
+uv run python -m monarch_phenology.weather_full --retry-errors --interval 0.25
 uv run python -m monarch_phenology.weather_full --export-only
 ```
 
@@ -130,7 +130,7 @@ The output directory is `runs/weather-full-7d`. [The local progress page](http:/
 
 The November 2 plan retains 113,634 public, unambiguous larva/pupa observations under the atlas filter. This includes 19,850 with unknown coordinate uncertainty, explicitly identified. It excludes 7,808 with uncertainty above 1 km, 15,439 obscured/private observations, and four disputed stage annotations. Seven-day weather dates are eligible for 98,339 records. Land-cover years are eligible for 98,326. The remaining records are retained with unavailable-year statuses rather than dropped. A January 1, 2026 observation can still have a valid weather window entirely in 2025, although its 2026 land-cover year is unavailable. Land-cover geographic coverage is determined by the point service, with NoData preserved.
 
-There are 95,167 distinct weather requests and 93,238 distinct coordinate/year land-cover requests before cache reuse. The pilot supplied 595 reusable weather requests and 598 land-cover requests. Duplicate coordinates and identical requested periods share a result. Each provider has four workers with a shared minimum interval of one second between requests. Throttling and service retry instructions defer subsequent requests to that provider. Transient failures are retried, then recorded for an explicit `--retry-errors` pass. At this pacing, the download has a lower bound of about 26 hours before slower responses, retries, and interruptions. The 60-request live smoke test completed successfully before the unrestricted background run started.
+There are 95,167 distinct weather requests and 93,238 distinct coordinate/year land-cover requests before cache reuse. The pilot supplied 595 reusable weather requests and 598 land-cover requests. Duplicate coordinates and identical requested periods share a result. Each provider has four parallel workers. The initial one-second shared request interval was conservative and imposed a roughly 26-hour lower bound. The accelerated run uses `--interval 0.25`, allowing up to four request starts per second per provider while keeping concurrency at four. This is an operational setting, not a published provider allowance. A staged test first checked two requests per second, then four. HTTP 429 or 503 responses impose a provider-wide cooldown, honor Retry-After, and double that provider's request spacing. Three consecutive server errors also slow the provider. After 100 successful responses, spacing gradually returns toward the configured target. Transient failures are retried, then recorded for an explicit `--retry-errors` pass. Runtime settings, code fingerprints, HTTP response counts, and measured throughput are recorded. The progress page estimates remaining time from completed lookups per second. Later retries, provider slowdowns, and interruptions can extend that estimate.
 
 `observations.sqlite` is the authoritative archive. `observations` stores IDs, dates, stages, coordinates, location uncertainty, human alive/dead annotations, and links to enrichment requests. `weather_daily` stores all seven daily variables once per exact coordinate and date. `weather_summaries` stores seven-day metrics once per unique request. `landcover_results` stores original categories and simplified habitat groups. `requests` contains parameters, result status, attempt count, retrieval time, compressed original responses, error details, and cache provenance. `metadata` records configuration, source fingerprint, product information, units, and pipeline fingerprint. `excluded_observations` records excluded IDs and reasons. `enriched_observations` is a convenient joined SQL view. No sampling weights are needed for this full census of the retained atlas records.
 
@@ -148,7 +148,7 @@ WHERE d.date >= date(o.observed_on, '-7 days')
   AND d.date < o.observed_on;
 ```
 
-At most 688,373 daily observation-date records are needed before deduplicating overlapping locations and windows. This is about 50 times fewer than the earlier full-year plan. The actual daily table will be smaller. The storage estimate is hundreds of megabytes for the structured archive, rather than continental raster volumes. The starting SQLite file, which includes the complete request plan, is approximately 192 MiB. Final size depends on responses and SQLite allocation. The implementation passed 56 Python tests and a desktop/mobile progress-page browser check.
+At most 688,373 daily observation-date records are needed before deduplicating overlapping locations and windows. This is about 50 times fewer than the earlier full-year plan. The actual daily table will be smaller. The storage estimate is hundreds of megabytes for the structured archive, rather than continental raster volumes. The starting SQLite file, which includes the complete request plan, is approximately 192 MiB. Final size depends on responses and SQLite allocation. The implementation passed 57 Python tests, including shared cooldown behavior, and a desktop/mobile progress-page browser check.
 
 ### Earlier full-year Daymet archive prototype
 

@@ -57,3 +57,27 @@ def test_plan_preserves_unavailable_dates_reuses_jobs_and_exports(tmp_path,monke
         with pytest.raises(ValueError,match='configuration changed'):
             plan(db,source,out,tmp_path/'pilot',last_year=2024)
     finally:db.close()
+
+
+def test_shared_cooldown_and_independent_provider_pacing(monkeypatch):
+    from monarch_phenology.weather_full import Transport
+    clock=[100.0]
+    monkeypatch.setattr('monarch_phenology.weather_full.time.monotonic',lambda:clock[0])
+    monkeypatch.setattr('monarch_phenology.weather_full.time.sleep',lambda seconds:clock.__setitem__(0,clock[0]+seconds))
+    t=Transport(.25)
+    try:
+        t.wait_turn('daymet');t.wait_turn('daymet')
+        assert clock[0]==100.25
+        t.record_response('daymet',429,'60')
+        assert t.effective['daymet']==.5
+        assert t.effective['landcover']==.25
+        t.wait_turn('landcover')
+        assert clock[0]==100.25
+        t.wait_turn('daymet')
+        assert clock[0]==160.25
+        for _ in range(100):t.record_response('daymet',200)
+        assert t.effective['daymet']==pytest.approx(.45)
+        for _ in range(3):t.record_response('daymet',500)
+        assert t.effective['daymet']==pytest.approx(.9)
+        assert t.snapshot()['daymet']['http_responses']=={'429':1,'200':100,'500':3}
+    finally:t.client.close()

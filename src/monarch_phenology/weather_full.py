@@ -214,25 +214,58 @@ class Transport:
         self.interval=interval
         self.locks={s:Lock() for s in ('daymet','landcover')}
         self.next={s:0.0 for s in self.locks}
+        self.effective={s:interval for s in self.locks}
+        self.codes={s:Counter() for s in self.locks}
+        self.successes={s:0 for s in self.locks}
+        self.failures={s:0 for s in self.locks}
         self.client=httpx.Client(timeout=90,follow_redirects=True,headers={'User-Agent':'monarch-phenology/0.1 (cached research point extraction)'})
+
+    def wait_turn(self, service):
+        while True:
+            with self.locks[service]:
+                delay=self.next[service]-time.monotonic()
+                if delay<=0:
+                    self.next[service]=time.monotonic()+self.effective[service]
+                    return
+            # Release the lock while sleeping so responses can extend a shared cooldown.
+            time.sleep(min(delay,1.0))
+
+    def record_response(self, service, code, retry_after=None):
+        delay=0
+        if code in (429,503):
+            try:delay=float(retry_after or '30')
+            except ValueError:
+                try:delay=(parsedate_to_datetime(retry_after)-datetime.now(timezone.utc)).total_seconds()
+                except (TypeError,ValueError):delay=30
+        with self.locks[service]:
+            self.codes[service][str(code)]+=1
+            self.failures[service]=self.failures[service]+1 if code>=500 else 0
+            if code in (429,503) or self.failures[service]>=3:
+                self.effective[service]=min(10,max(self.interval,self.effective[service]*2))
+                self.next[service]=max(self.next[service],time.monotonic()+max(5,delay))
+                self.successes[service]=0
+                self.failures[service]=0
+            elif code==200:
+                self.successes[service]+=1
+                if self.successes[service]>=100:
+                    self.effective[service]=max(self.interval,self.effective[service]*0.9)
+                    self.successes[service]=0
+
+    def snapshot(self):
+        result={}
+        for service in self.locks:
+            with self.locks[service]:
+                result[service]={'target_interval_seconds':self.interval,'effective_interval_seconds':self.effective[service],'http_responses':dict(self.codes[service]),'cooldown_seconds':max(0,self.next[service]-time.monotonic())}
+        return result
 
     def fetch(self, job):
         service=job['service'];params=json.loads(job['params']);body=None;code=None
         for attempt in range(4):
-            with self.locks[service]:
-                time.sleep(max(0,self.next[service]-time.monotonic()))
-                self.next[service]=time.monotonic()+self.interval
+            self.wait_turn(service)
             try:
                 r=self.client.get(DAYMET if service=='daymet' else SERVICE,params=params)
                 body=r.text;code=r.status_code
-                if code in (429,503):
-                    retry=r.headers.get('Retry-After','30')
-                    try:delay=float(retry)
-                    except ValueError:
-                        try:delay=(parsedate_to_datetime(retry)-datetime.now(timezone.utc)).total_seconds()
-                        except (TypeError,ValueError):delay=30
-                    with self.locks[service]:
-                        self.next[service]=max(self.next[service],time.monotonic()+max(5,delay))
+                self.record_response(service,code,r.headers.get('Retry-After'))
                 if service=='daymet' and code==400 and 'Tile was not found' in body:
                     return {'status':'outside_daymet_coverage','body':body,'response_code':code,'attempts':attempt+1}
                 r.raise_for_status()
@@ -244,7 +277,7 @@ class Transport:
                 time.sleep(2**(attempt+1))
 
 
-def status(db,output,state):
+def status(db,output,state,transport=None,started=None,completed=None):
     jobs={}
     for row in db.execute('SELECT service,status,count(*) AS n FROM requests GROUP BY service,status'):
         jobs.setdefault(row['service'],{})[row['status']]=row['n']
@@ -255,6 +288,10 @@ def status(db,output,state):
     result['habitat_counts']=dict(db.execute('SELECT l.habitat_group,count(*) FROM observations o JOIN landcover_results l ON l.key=o.landcover_key GROUP BY l.habitat_group'))
     exported=db.execute("SELECT value FROM metadata WHERE key='exported_at'").fetchone()
     result['csv_snapshot_at']=exported[0] if exported else None
+    if transport:
+        elapsed=max(0.001,time.monotonic()-started)
+        result['transport']=transport.snapshot()
+        result['run_performance']={'elapsed_seconds':elapsed,'completed_jobs':dict(completed),'jobs_per_second':{s:completed[s]/elapsed for s in ('daymet','landcover')}}
     write_json(output/'status.json',result)
     return result
 
@@ -275,11 +312,15 @@ def run(db,output,workers,interval,limit=None):
     with db:
         db.execute("UPDATE requests SET status='pending' WHERE status='running'")
     transport=Transport(interval)
+    started=time.monotonic()
+    completed_by_service=Counter()
+    with db:
+        db.execute('INSERT INTO metadata VALUES(?,?)',('runtime:'+now(),encoded({'workers_per_provider':workers,'target_interval_seconds':interval,'pipeline_sha256':hashlib.sha256(Path(__file__).read_bytes()).hexdigest()})))
     queues={s:iter(db.execute("SELECT * FROM requests WHERE status='pending' AND service=? ORDER BY key",(s,)).fetchall()) for s in ('daymet','landcover')}
     # Separate pools prevent a slow provider from occupying every worker.
     pools={s:ThreadPoolExecutor(max_workers=workers) for s in queues}
     active={};submitted=0;completed=0;last_status=time.monotonic()
-    status(db,output,'running')
+    status(db,output,'running',transport,started,completed_by_service)
     def submit(service):
         nonlocal submitted
         if limit is not None and submitted>=limit:return
@@ -293,9 +334,9 @@ def run(db,output,workers,interval,limit=None):
         while active:
             finished,_=wait(active,timeout=20,return_when=FIRST_COMPLETED)
             for future in finished:
-                job=active.pop(future);save_result(db,job,future.result());completed+=1;submit(job['service'])
+                job=active.pop(future);save_result(db,job,future.result());completed+=1;completed_by_service[job['service']]+=1;submit(job['service'])
             if time.monotonic()-last_status>25 or not active:
-                info=status(db,output,'running');print(encoded({'completed_this_process':completed,**info}),flush=True);last_status=time.monotonic()
+                info=status(db,output,'running',transport,started,completed_by_service);print(encoded({'completed_this_process':completed,**info}),flush=True);last_status=time.monotonic()
     finally:
         for pool in pools.values():pool.shutdown(wait=True)
         transport.client.close()
@@ -303,7 +344,7 @@ def run(db,output,workers,interval,limit=None):
     errors=db.execute("SELECT count(*) FROM requests WHERE status='request_error'").fetchone()[0]
     export(db,output)
     state='partial' if pending else 'finished_with_errors' if errors else 'complete'
-    info=status(db,output,state)
+    info=status(db,output,state,transport,started,completed_by_service)
     db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
     print(encoded(info),flush=True)
 
@@ -320,7 +361,7 @@ def main():
     p.add_argument('--workers',type=int,default=4,help='Concurrent workers per provider')
     p.add_argument('--interval',type=float,default=1.0,help='Minimum seconds between requests per provider')
     args=p.parse_args()
-    if args.workers<1 or args.interval<0.6 or (args.limit is not None and args.limit<1):p.error('Invalid worker count, pacing or limit')
+    if args.workers<1 or args.interval<0.25 or (args.limit is not None and args.limit<1):p.error('Invalid worker count, pacing or limit')
     args.output.mkdir(parents=True,exist_ok=True)
     with (args.output/'run.lock').open('w') as lock:
         try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)

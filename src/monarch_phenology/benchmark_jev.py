@@ -15,7 +15,7 @@ import time
 from dotenv import load_dotenv
 import httpx
 
-from .jev_client import QUESTIONS, STAGES, classify_image, prepare_image, request_with_retry
+from .jev_client import EXTRA_LABELS, STAGES, classify_image, get_questions, prepare_image, request_with_retry
 
 
 def write_json(path: Path, value: object) -> None:
@@ -84,6 +84,7 @@ def collect_candidates(client: httpx.Client, stage: str, args: argparse.Namespac
                 "observer_id": observation.get("user", {}).get("id"),
                 "license_code": photo.get("license_code"), "attribution": photo.get("attribution"),
                 "life_stage_annotations": [a for a in observation["annotations"] if a["controlled_attribute_id"] == 1],
+                "other_annotations": [a for a in observation["annotations"] if a["controlled_attribute_id"] != 1],
             })
         last_id = min(o["id"] for o in observations)
         if len(observations) < params["per_page"]:
@@ -98,6 +99,14 @@ def prepare_dataset(args: argparse.Namespace) -> dict:
     output.mkdir(parents=True, exist_ok=True)
     (output / "images").mkdir(exist_ok=True)
     config = {"per_stage": args.per_stage, "pool_size": args.pool_size, "seed": args.seed, "place_id": args.place_id}
+    exclusions = []
+    excluded_samples = []
+    for run_dir in getattr(args, "exclude_run", []):
+        content = (run_dir / "manifest.json").read_bytes()
+        exclusions.append({"path": str(run_dir.resolve()), "manifest_sha256": digest(content)})
+        excluded_samples.extend(json.loads(content)["samples"])
+    if exclusions:
+        config["exclusions"] = exclusions
     path = output / "manifest.json"
     manifest = json.loads(path.read_text()) if path.exists() else {
         "config": config, "created_at": datetime.now(timezone.utc).isoformat(),
@@ -107,9 +116,9 @@ def prepare_dataset(args: argparse.Namespace) -> dict:
     if manifest["config"] != config:
         raise ValueError("Sampling settings changed. Use a different output directory.")
     samples = manifest["samples"]
-    seen_photos = {s["photo_id"] for s in samples}
-    seen_observations = {s["observation_id"] for s in samples}
-    seen_hashes = {s["sha256"] for s in samples}
+    seen_photos = {s["photo_id"] for s in [*samples, *excluded_samples]}
+    seen_observations = {s["observation_id"] for s in [*samples, *excluded_samples]}
+    seen_hashes = {s["sha256"] for s in [*samples, *excluded_samples]}
     with httpx.Client(timeout=60, follow_redirects=True, headers={"User-Agent": "monarch-phenology/0.1.0"}) as client:
         for stage in STAGES:
             count = sum(s["expected_stage"] == stage for s in samples)
@@ -209,14 +218,29 @@ def evaluate(samples: list[dict], results: dict, threshold: float) -> dict:
 
 def save_reports(output: Path, manifest: dict, results: dict, threshold: float) -> dict:
     summary = evaluate(manifest["samples"], results, threshold)
+    extended = [r for r in results.values() if r.get("status") == "ok" and "extra_probabilities" in r]
+    if extended:
+        summary["larval_development_counts"] = {label: sum(r["larval_development"] == label for r in extended) for label in {r["larval_development"] for r in extended}}
+        summary["evidence_counts"] = {label: sum(r["evidence"] == label for r in extended) for label in {r["evidence"] for r in extended}}
+        summary["extra_labels"] = {
+            label: {"positive": sum(r["extra_probabilities"][label] >= 0.7 for r in extended),
+                    "uncertain": sum(0.3 < r["extra_probabilities"][label] < 0.7 for r in extended),
+                    "negative": sum(r["extra_probabilities"][label] <= 0.3 for r in extended)}
+            for label in EXTRA_LABELS
+        }
+        summary["extra_label_evaluation"] = "Prediction counts only. No photo-level reference labels are available for these categories. Positive >= 0.7, negative <= 0.3, otherwise uncertain."
     write_json(output / "summary.json", summary)
     fields = ["observation_id", "photo_id", "expected_stage", "prediction", "status", "confidence", "observation_url", "image_path", "error", "review_reasons"]
     fields += [f"p_{s}" for s in STAGES]
+    if extended:
+        fields += ["evidence", "evidence_confidence", "larval_development", "larval_development_confidence", *[f"p_{label}" for label in EXTRA_LABELS]]
     rows = []
     for sample in manifest["samples"]:
         result = results.get(str(sample["photo_id"]), {"status": "pending"})
         row = {key: {**sample, **result}.get(key) for key in fields}
         row.update({f"p_{s}": result.get("stage_probabilities", {}).get(s) for s in STAGES})
+        if extended:
+            row.update({f"p_{label}": result.get("extra_probabilities", {}).get(label) for label in EXTRA_LABELS})
         reasons = []
         if result["status"] != "ok":
             reasons.append(result["status"])
@@ -228,6 +252,17 @@ def save_reports(output: Path, manifest: dict, results: dict, threshold: float) 
             detected = {s for s in STAGES if result["stage_probabilities"][s] >= threshold}
             if detected != {sample["expected_stage"]}:
                 reasons.append("independent_questions_disagree")
+            if "extra_probabilities" in result:
+                if result["evidence"] != "monarch_visible":
+                    reasons.append("evidence_review")
+                if result["larval_development"] != "not_applicable":
+                    reasons.append("larval_development_review")
+                if any(p >= 0.7 for p in result["extra_probabilities"].values()):
+                    reasons.append("extra_label_positive")
+                if any(0.3 < p < 0.7 for p in result["extra_probabilities"].values()):
+                    reasons.append("extra_label_uncertain")
+                if (result["extra_probabilities"]["clustering"] >= 0.7 or result["extra_probabilities"]["nectaring"] >= 0.7) and result["prediction"] != "adult":
+                    reasons.append("behavior_stage_conflict")
         row["review_reasons"] = ", ".join(reasons)
         rows.append(row)
     for name, selected in [("predictions.csv", rows), ("review.csv", [r for r in rows if r["review_reasons"]])]:
@@ -243,12 +278,14 @@ def run_benchmark(args: argparse.Namespace, manifest: dict) -> dict:
     if not api_key:
         raise ValueError("Photos are ready. Set TYPESAFE_API_KEY in .env and rerun to score them.")
     path = args.output / "results.json"
+    prompt_version = getattr(args, "prompt_version", "v1")
+    questions = get_questions(prompt_version)
     identity = {
-        "model": args.model, "questions": QUESTIONS,
+        "model": args.model, "questions": questions,
         "samples": [[s["photo_id"], s["sha256"], s["expected_stage"]] for s in manifest["samples"]],
     }
     fingerprint = digest(json.dumps(identity, sort_keys=True).encode())
-    run = json.loads(path.read_text()) if path.exists() else {"fingerprint": fingerprint, "model": args.model, "questions": QUESTIONS, "results": {}}
+    run = json.loads(path.read_text()) if path.exists() else {"fingerprint": fingerprint, "model": args.model, "prompt_version": prompt_version, "questions": questions, "results": {}}
     if run["fingerprint"] != fingerprint:
         raise ValueError("Model, prompt or samples changed. Use a new output directory.")
     results = run["results"]
@@ -265,7 +302,8 @@ def run_benchmark(args: argparse.Namespace, manifest: dict) -> dict:
                 break
             start = time.monotonic()
             try:
-                result = classify_image(client, (args.output / sample["image_path"]).read_bytes(), args.model)
+                kwargs = {"prompt_version": prompt_version} if prompt_version != "v1" else {}
+                result = classify_image(client, (args.output / sample["image_path"]).read_bytes(), args.model, **kwargs)
                 results[key] = {
                     "status": "ok", **result, "seconds": time.monotonic() - start,
                     "classified_at": datetime.now(timezone.utc).isoformat(),
@@ -292,6 +330,8 @@ def main() -> None:
     parser.add_argument("--place-id", type=int, default=62068, help="California Floristic Province. Use 0 for worldwide.")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--model", default="jev-1.14.0")
+    parser.add_argument("--prompt-version", choices=["v1", "v2"], default="v1")
+    parser.add_argument("--exclude-run", type=Path, action="append", default=[], help="Exclude observations, photos and image hashes from a previous run. Repeatable.")
     parser.add_argument("--output", type=Path, default=Path("runs/jev-pilot"))
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--max-items", type=int, default=0, help="Cap new model calls. Zero scores all remaining photos.")

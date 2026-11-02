@@ -9,7 +9,8 @@ import pytest
 
 from monarch_phenology.benchmark_jev import annotation_stage, evaluate, run_benchmark, save_reports
 from monarch_phenology.jev_client import (
-    DESCRIPTIONS, STAGES, classify_image, parse_response, prepare_image, request_with_retry,
+    DESCRIPTIONS, STAGES, EXTRA_LABELS, EVIDENCE_OPTIONS, LARVAL_OPTIONS, get_questions,
+    classify_image, parse_response, prepare_image, request_with_retry,
 )
 
 
@@ -128,3 +129,79 @@ def test_review_includes_independent_disagreement_even_when_choice_is_correct(tm
         rows = list(csv.DictReader(handle))
     assert len(rows) == 1
     assert rows[0]["review_reasons"] == "independent_questions_disagree"
+
+
+def extended_response(stage="adult"):
+    raw = response_for(stage)
+    raw["answers"].update({label: {"type": "noul", "noul": 0.05} for label in EXTRA_LABELS})
+    for key, options, selected in [
+        ("evidence", EVIDENCE_OPTIONS, "monarch_visible"),
+        ("larval_development", LARVAL_OPTIONS, "not_applicable"),
+    ]:
+        raw["answers"][key] = {"type": "choice", "choice": selected, "confidence": 1,
+                               "probabilities": {name: float(name == selected) for name in options}}
+    return raw
+
+
+def test_v2_retains_adult_stage_with_overlapping_behavior_tags(tmp_path):
+    raw = extended_response()
+    raw["answers"]["clustering"]["noul"] = .9
+    raw["answers"]["nectaring"]["noul"] = .75
+    result = {"status": "ok", **parse_response(raw, "v2")}
+    assert result["prediction"] == "adult"
+    summary = save_reports(tmp_path, {"samples": [{"photo_id": 1, "expected_stage": "adult"}]}, {"1": result}, .5)
+    assert summary["accuracy"] == 1
+    assert summary["extra_labels"]["clustering"]["positive"] == 1
+    assert summary["extra_labels"]["nectaring"]["positive"] == 1
+    assert "accuracy" not in summary["extra_labels"]["clustering"]
+
+
+def test_empty_chrysalis_and_dead_remains_are_independent():
+    raw = extended_response("unknown")
+    raw["answers"]["empty_chrysalis"]["noul"] = .95
+    result = parse_response(raw, "v2")
+    assert result["extra_probabilities"]["empty_chrysalis"] == .95
+    assert result["extra_probabilities"]["dead_remnants"] == .05
+    assert "evidence" not in get_questions("v1")
+    assert "larval_development" not in get_questions("v1")
+
+
+def test_v2_requires_valid_extra_answers():
+    raw = extended_response()
+    raw["answers"]["larval_development"]["probabilities"]["small_early"] = float("nan")
+    with pytest.raises(ValueError):
+        parse_response(raw, "v2")
+    raw = extended_response()
+    del raw["answers"]["empty_chrysalis"]
+    with pytest.raises(KeyError):
+        parse_response(raw, "v2")
+
+
+def test_sampler_excludes_previous_observations_photos_and_hashes(tmp_path, monkeypatch):
+    from monarch_phenology.benchmark_jev import digest, prepare_dataset
+    def picture(color):
+        stream = io.BytesIO()
+        Image.new("RGB", (300, 300), color).save(stream, "PNG")
+        return stream.getvalue()
+    old_bytes = picture("red")
+    previous = tmp_path / "previous"
+    previous.mkdir()
+    (previous / "manifest.json").write_text(json.dumps({"samples": [{"photo_id": 99, "observation_id": 99, "sha256": digest(prepare_image(old_bytes))}]}))
+    def candidates(client, stage, args):
+        idx = list(STAGES).index(stage)
+        return [
+            {"photo_id": 100+idx, "observation_id": 99, "expected_stage": stage, "photo_url": "excluded_observation"},
+            {"photo_id": 99, "observation_id": 200+idx, "expected_stage": stage, "photo_url": "excluded_photo"},
+            {"photo_id": 300+idx, "observation_id": 300+idx, "expected_stage": stage, "photo_url": "duplicate_content"},
+            {"photo_id": 400+idx, "observation_id": 400+idx, "expected_stage": stage, "photo_url": stage},
+        ]
+    def download(client, method, url):
+        assert url not in {"excluded_observation", "excluded_photo"}
+        content = old_bytes if url == "duplicate_content" else picture((0, 50 + 40 * list(STAGES).index(url), 100))
+        return httpx.Response(200, content=content)
+    monkeypatch.setattr("monarch_phenology.benchmark_jev.collect_candidates", candidates)
+    monkeypatch.setattr("monarch_phenology.benchmark_jev.request_with_retry", download)
+    args = SimpleNamespace(output=tmp_path / "new", per_stage=1, pool_size=10, seed=43, place_id=62068, exclude_run=[previous])
+    manifest = prepare_dataset(args)
+    assert {s["photo_id"] for s in manifest["samples"]} == {400, 401, 402, 403}
+    assert len(manifest["config"]["exclusions"]) == 1

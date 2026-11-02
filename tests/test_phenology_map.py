@@ -97,3 +97,28 @@ def test_incomplete_download_is_not_presented_as_finished(tmp_path):
     pm.write_json(tmp_path / "source.json", {"complete": False})
     with pytest.raises(ValueError, match="incomplete"):
         pm.build_map(tmp_path)
+
+
+def test_build_counts_unique_observations_and_preserves_coordinates(tmp_path):
+    (tmp_path / "pages").mkdir()
+    (tmp_path / "assets").mkdir()
+    for name in pm.ASSETS:
+        (tmp_path / "assets" / name).write_text("cached test asset")
+    pm.write_json(tmp_path / "source.json", {
+        "complete": True, "downloaded": 3, "params": {"d2": "2026-11-02"},
+        "started_at": "2026-11-02", "completed_at": "2026-11-02", "place": "North America", "place_id": 97394,
+    })
+    rows = [observation(id=1), observation(id=2, obscured=True), observation(id=3, annotations=[{"controlled_attribute_id": 1, "controlled_value_id": 4}])]
+    pm.write_json(tmp_path / "pages/segment-0-00000.json", {"results": rows})
+    html = pm.build_map(tmp_path).read_text()
+    payload = json.loads(html.split('<script id="map-data" type="application/json">')[1].split('</script>')[0])
+    assert payload["stats"]["mapped"] == 2
+    assert payload["stats"]["larvae"] == payload["stats"]["pupae"] == 1
+    assert payload["stats"]["excluded"] == {"obscured_or_private": 1}
+    assert payload["observations"][0][4:6] == [38.5, -121.5]
+    assert [r["level"] for r in payload["resolutions"]] == list(range(16))
+    assert payload["preview"] is False
+
+    pm.write_json(tmp_path / "pages/segment-0-00001.json", {"results": [rows[0]]})
+    with pytest.raises(ValueError, match="Duplicate observation"):
+        pm.build_map(tmp_path)

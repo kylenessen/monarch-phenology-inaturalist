@@ -38,6 +38,8 @@ The container runs `monarch run` (periodic ingest + continuous classify).
 
 ## Status
 
+The standalone [Jev life stage pilot](docs/JEV_BENCHMARK.md) downloads 100 annotated photos per stage and scores each photo independently. Run `uv run python -m monarch_phenology.benchmark_jev` with `TYPESAFE_API_KEY` in `.env`. It requires no database and saves resumable results under `runs/jev-pilot`.
+
 Early development. Project structure and data pipeline under construction.
 
 ## License

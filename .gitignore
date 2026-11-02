@@ -61,6 +61,8 @@ Thumbs.db
 
 # Env
 .env
+.venv/
+/runs/
 
 # IDE
 .vscode/

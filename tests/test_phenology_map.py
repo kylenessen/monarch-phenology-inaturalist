@@ -1,7 +1,6 @@
 from datetime import date
 import json
 
-import h3
 import httpx
 import pytest
 
@@ -21,8 +20,7 @@ def observation(**changes):
 def test_location_order_and_week_alignment():
     row, reason = pm.normalize_observation(observation(), date(2026, 11, 2))
     assert reason is None
-    assert row["cells"][0] == h3.latlng_to_cell(38.5, -121.5, 7)
-    assert row["cells"][1] == h3.latlng_to_cell(38.5, -121.5, 8)
+    assert (row["lat"], row["lon"]) == (38.5, -121.5)
     assert row["week"] == 9
     assert pm.seasonal_week(date(2024, 3, 5)) == pm.seasonal_week(date(2025, 3, 5))
     assert pm.seasonal_week(date(2024, 2, 29)) == 8

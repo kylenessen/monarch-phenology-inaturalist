@@ -26,13 +26,13 @@
     <p class="intro">Human-annotated larvae and pupae.</p>
     <div><label class="field" for="year">Time period</label><select class="select" id="year"><option value="all">All years · seasonal cycle</option></select></div>
     <div><span class="field" id="stageLabel">Life stage</span><div class="segmented" role="group" aria-labelledby="stageLabel"><button data-stage="both" aria-pressed="true">Both</button><button data-stage="0" aria-pressed="false">Larvae</button><button data-stage="1" aria-pressed="false">Pupae</button></div></div>
-    <div><label class="field" for="resolution">Hexagon size</label><select class="select" id="resolution"><option value="7">Fine · H3 7 · ~5.2 km²</option><option value="8">Finer · H3 8 · ~0.74 km²</option></select></div>
+    <div><label class="field" for="resolution">Hexagon size</label><select class="select" id="resolution"></select></div>
     <div><label class="field" for="accuracy">Location accuracy</label><select class="select" id="accuracy"><option value="standard">≤1 km or unstated</option><option value="precise">≤1 km only</option><option value="all">All public coordinates</option></select></div>
-    <p class="subtle precision-note">Zoom in to see individual hexagons.</p>
+    <p class="subtle precision-note"><span id="gridNote">Choose a broader grid to see continental waves.</span></p>
     <div class="stat"><strong id="weekCount">…</strong><p>observations this week, across North America</p><div class="split"><span><b id="larvaCount">0</b> larvae</span><span><b id="pupaCount">0</b> pupae</span></div><p id="hexCount"></p></div>
   </aside>
   <div class="panel date-badge"><small id="periodLabel">All years pooled</small><strong id="dateLabel">Loading observations</strong></div>
-  <div class="panel key" aria-label="Color legend"><strong>Observations / hex / week</strong><div class="ramp" id="ramp"></div><div class="ramp-labels"><span>1</span><span>2–3</span><span>4–7</span><span>8–15</span><span>16–31</span><span>32+</span></div><p>Fixed scale throughout playback.<br>Counts reflect observation effort too.</p></div>
+  <div class="panel key" aria-label="Color legend"><strong>Observations / hex / week</strong><div class="ramp" id="ramp"></div><div class="ramp-labels"><span>1</span><span>2–3</span><span>4–7</span><span>8–15</span><span>16–31</span><span>32+</span></div><p>Color breaks stay fixed during playback.<br>Counts reflect observation effort too.</p></div>
   <div id="empty" class="panel empty hidden"><strong>No observations this week</strong><p>Advance the timeline or choose another year. No records does not mean no monarchs.</p></div>
   <div id="tileNotice" class="notice hidden">The background map is unavailable. Hexagons and playback still work.</div>
   <section class="panel timeline" aria-label="Weekly playback">
@@ -44,15 +44,16 @@
   </section>
 </main>
 <dialog id="about"><button class="close" id="closeAbout" aria-label="Close data information">✕</button><h2>Reading this map</h2><p id="sourceDescription"></p>
-  <p>Each hexagon counts unique observations, not individual caterpillars, pupae, photos, or butterflies. Repeat visits to the same animal can be separate observations. The color bins stay fixed across weeks, years, stage filters, and zoom levels. A darker hexagon means more records, not an estimate of population density.</p>
+  <p>Each hexagon counts unique observations, not individual caterpillars, pupae, photos, or butterflies. Repeat visits to the same animal can be separate observations. The color bins stay fixed across weeks, years, stage filters, and zoom levels. Broader H3 resolutions use higher color breaks so large cells do not all saturate. Legend values are the lower bound of each color bin. A darker hexagon means more records, not an estimate of population density.</p>
   <p>Individual years use consecutive seven-day windows starting January 1, with a short final window. The pooled seasonal cycle aligns month and day on a leap-year calendar. The February 26 to March 3 bin has six days in non-leap years. Pooled counts are summed across years, not annual averages. Recent years have more observation effort, and the current year is incomplete.</p>
   <p>Only unambiguous, undisputed iNaturalist Life Stage annotations are included. Eggs and adults are excluded. These are community annotations, not Jev predictions, and have not received a separate expert audit. A pupa label alone does not distinguish an occupied chrysalis from an empty one.</p>
-  <p>Obscured or private locations are excluded. The default excludes reported accuracy worse than 1 km but includes unstated accuracy. Choose “≤1 km only” to exclude those unstated locations too. Fine hexagons show the reported location, not certainty about its exact position. H3 8 cells are smaller than some location uncertainty circles.</p>
+  <p>Obscured or private locations are excluded. The default excludes reported accuracy worse than 1 km but includes unstated accuracy. Choose “≤1 km only” to exclude those unstated locations too. Fine hexagons show the reported location, not certainty about its exact position. High resolutions can be much finer than the location accuracy. Choosing a smaller grid does not improve the underlying coordinates. All 16 H3 resolutions are available. Areas shown are global averages and vary geographically.</p>
   <dl id="sourceStats"></dl><p>Sources <a href="https://www.inaturalist.org/observations?taxon_id=48662&place_id=97394&term_id=1&term_value_id=4,6" target="_blank" rel="noopener">iNaturalist observations</a> and <a href="https://h3geo.org/docs/core-library/restable/" target="_blank" rel="noopener">H3 cell sizes</a>. Map tiles by OpenStreetMap contributors. Built locally without model calls.</p>
 </dialog>
 <div id="loading" role="status">Preparing the weekly atlas…</div>
 <script id="map-data" type="application/json">__MAP_DATA__</script>
 <script src="assets/leaflet.js"></script>
+<script src="assets/h3-js.js"></script>
 <script>
 'use strict';
 try {
@@ -61,11 +62,19 @@ if(DATA.preview) document.querySelector('.header-note').textContent='Preview · 
 const $ = id => document.getElementById(id);
 const fmt = number => number.toLocaleString('en-US');
 const COLORS = ['#fff7bc','#fee391','#fec44f','#fe9929','#ec7014','#cc4c02'];
-const color = n => COLORS[n >= 32 ? 5 : n >= 16 ? 4 : n >= 8 ? 3 : n >= 4 ? 2 : n >= 2 ? 1 : 0];
+let breaks=[1,2,4,8,16,32];
+const color = n => COLORS[breaks.reduce((index,threshold,i)=>n>=threshold?i:index,0)];
+function updateLegend(){
+  breaks=({0:[1,10,50,200,1000,5000],1:[1,5,20,100,500,2000],2:[1,5,20,50,100,500],3:[1,3,10,25,50,100]})[state.resolution]||[1,2,4,8,16,32];
+  const labels=document.querySelector('.ramp-labels');labels.replaceChildren();
+  breaks.forEach((n,i)=>{const label=document.createElement('span');label.textContent=(n>=1000?(n/1000)+'k':n)+(i===5?'+':'');label.title=fmt(n)+(i===5?' or more':' to '+fmt(breaks[i+1]-1))+' observations';labels.appendChild(label);});
+}
 const years = Object.keys(DATA.stats.years).sort().reverse();
 const cutoffYear = Number(DATA.cutoff.slice(0,4));
 years.forEach(year => {const option = new Option(year + (Number(year) === cutoffYear ? ' · through ' + DATA.cutoff.slice(5) : ''), year);$('year').add(option);});
-const state = {year:'all', stage:'both', resolution:7, accuracy:'standard', week:0, frames:[], totals:[], selected:[], playing:false, timer:null};
+DATA.resolutions.forEach(({level,area_km2})=>{const area=area_km2>=100?fmt(Math.round(area_km2))+' km²':area_km2>=1?area_km2.toFixed(1)+' km²':area_km2>=0.1?area_km2.toFixed(2)+' km²':fmt(Math.round(area_km2*1000000))+' m²';$('resolution').add(new Option('H3 '+level+' · ~'+area,level));});
+$('resolution').value='4';
+const state = {year:'all', stage:'both', resolution:4, accuracy:'standard', week:0, frames:[], totals:[], selected:[], playing:false, timer:null};
 const map = L.map('map', {preferCanvas:true, zoomControl:false, minZoom:2, maxZoom:18, worldCopyJump:false});
 L.control.zoom({position:'topright'}).addTo(map);
 const renderer = L.canvas({padding:0.3});
@@ -81,27 +90,30 @@ COLORS.forEach(c => {const swatch=document.createElement('span');swatch.style.ba
 function windowDates(index){
   const year = state.year === 'all' ? 2000 : Number(state.year);
   const start = new Date(Date.UTC(year,0,1 + index*7));
-  const end = new Date(Math.min(Date.UTC(year,0,7 + index*7),Date.UTC(year,11,31)));
+  let end = new Date(Math.min(Date.UTC(year,0,7 + index*7),Date.UTC(year,11,31)));
+  const cutoff = new Date(DATA.cutoff+'T00:00:00Z');
+  if(state.year===String(cutoffYear)&&start<=cutoff&&end>cutoff)end=cutoff;
   return [start,end];
 }
 function shortDate(date){return date.toLocaleDateString('en-US',{month:'short',day:'numeric',timeZone:'UTC'});}
 function weekLabel(index){const [a,b]=windowDates(index);return shortDate(a)+' – '+shortDate(b);}
 function stop(){state.playing=false;clearInterval(state.timer);state.timer=null;$('play').textContent='▶ Play';$('play').setAttribute('aria-label','Play weekly animation');}
 function play(){state.playing=true;$('play').textContent='Ⅱ Pause';$('play').setAttribute('aria-label','Pause weekly animation');state.timer=setInterval(()=>setWeek((state.week+1)%state.frames.length),Number($('speed').value));}
-function popup(cellIndex, rows){
+function popup(cell, rows){
   const larvae=rows.filter(r=>r[2]===0).length;
   const unknown=rows.filter(r=>r[3]===null).length;
   const coarse=rows.filter(r=>r[3]!==null&&r[3]>1000).length;
   const links=rows.slice().sort((a,b)=>a[1].localeCompare(b[1])).map(r=>'<a target="_blank" rel="noopener" href="https://www.inaturalist.org/observations/'+r[0]+'">'+r[1]+' · '+(r[2]===0?'Larva':'Pupa')+' · #'+r[0]+'</a>').join('');
-  return '<div class="popup"><h3>'+fmt(rows.length)+' observations</h3><p>'+larvae+' larvae · '+(rows.length-larvae)+' pupae</p><p>'+weekLabel(state.week)+' · '+(state.year==='all'?'all years':state.year)+'</p><code>'+DATA.cells[cellIndex][0]+'</code><p>'+unknown+' unstated accuracy'+(coarse?' · '+coarse+' worse than 1 km':'')+'</p><div class="links">'+links+'</div></div>';
+  return '<div class="popup"><h3>'+fmt(rows.length)+' observations</h3><p>'+larvae+' larvae · '+(rows.length-larvae)+' pupae</p><p>'+weekLabel(state.week)+' · '+(state.year==='all'?'all years':state.year)+'</p><code>'+cell+'</code><p>'+unknown+' unstated accuracy'+(coarse?' · '+coarse+' worse than 1 km':'')+'</p><div class="links">'+links+'</div></div>';
 }
+function boundary(cell){const center=h3.cellToLatLng(cell)[1];const ref=center+360*Math.round((map.getCenter().lng-center)/360);return h3.cellToBoundary(cell).map(([lat,lon])=>[lat,lon+360*Math.round((ref-lon)/360)]);}
 function setWeek(index){
   state.week=Math.max(0,Math.min(state.frames.length-1,index));
   $('week').value=state.week;map.closePopup();polygons.clearLayers();
   const frame=state.frames[state.week];
   const groups=new Map();let larvae=0;
-  for(const row of frame){const cell=row[state.resolution===7?4:5];if(!groups.has(cell))groups.set(cell,[]);groups.get(cell).push(row);if(row[2]===0)larvae++;}
-  for(const [cell,rows] of groups){L.polygon(DATA.cells[cell][1],{renderer,color:'#9a5d24',weight:1.2,opacity:0.9,fillColor:color(rows.length),fillOpacity:0.88}).bindPopup(()=>popup(cell,rows),{maxWidth:290,autoPanPaddingTopLeft:[innerWidth>700?340:15,130],autoPanPaddingBottomRight:[20,220]}).addTo(polygons);}
+  for(const row of frame){const cell=h3.latLngToCell(row[4],row[5],state.resolution);if(!groups.has(cell))groups.set(cell,[]);groups.get(cell).push(row);if(row[2]===0)larvae++;}
+  for(const [cell,rows] of groups){L.polygon(boundary(cell),{renderer,color:'#9a5d24',weight:state.resolution<=6?0.6:1.2,opacity:0.65,fillColor:color(rows.length),fillOpacity:0.88}).bindPopup(()=>popup(cell,rows),{maxWidth:290,autoPanPaddingTopLeft:[innerWidth>700?340:15,130],autoPanPaddingBottomRight:[20,220]}).addTo(polygons);}
   $('weekCount').textContent=fmt(frame.length);$('larvaCount').textContent=fmt(larvae);$('pupaCount').textContent=fmt(frame.length-larvae);$('hexCount').textContent=fmt(groups.size)+' occupied hexagons';
   $('dateLabel').textContent=weekLabel(state.week);
   $('periodLabel').textContent=state.year==='all'?'All years pooled':state.year+' · observed dates';
@@ -111,7 +123,7 @@ function setWeek(index){
   $('empty').classList.toggle('hidden',frame.length>0);
 }
 function rebuild(){
-  stop();
+  stop();updateLegend();
   state.selected=DATA.observations.filter(r=>(state.year==='all'||r[1].startsWith(state.year+'-'))&&(state.stage==='both'||r[2]===Number(state.stage))&&(state.accuracy==='all'||(r[3]!==null?r[3]<=1000:state.accuracy==='standard')));
   let lastWeek=52;
   if(state.year===String(cutoffYear)){const d=new Date(DATA.cutoff+'T00:00:00Z');lastWeek=Math.floor((d-Date.UTC(cutoffYear,0,1))/86400000/7);}
@@ -137,7 +149,7 @@ function rebuild(){
   setWeek(state.week);
 }
 $('year').onchange=()=>{state.year=$('year').value;rebuild();};
-$('resolution').onchange=()=>{state.resolution=Number($('resolution').value);rebuild();};
+$('resolution').onchange=()=>{state.resolution=Number($('resolution').value);$('gridNote').textContent=state.resolution>=8?'Grid size may be finer than location accuracy.':state.resolution<=4?'Broader cells reveal the continental pattern.':'Zoom in to see individual hexagons.';rebuild();};
 $('accuracy').onchange=()=>{state.accuracy=$('accuracy').value;rebuild();};
 document.querySelectorAll('[data-stage]').forEach(button=>button.onclick=()=>{state.stage=button.dataset.stage;document.querySelectorAll('[data-stage]').forEach(b=>b.setAttribute('aria-pressed',b===button?'true':'false'));rebuild();});
 $('week').oninput=()=>{stop();setWeek(Number($('week').value));};

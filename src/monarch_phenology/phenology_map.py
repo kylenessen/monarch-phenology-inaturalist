@@ -161,7 +161,7 @@ def normalize_observation(row: dict, cutoff: date) -> tuple[dict | None, str | N
         "id": row["id"], "date": observed.isoformat(), "year": observed.year,
         "week": (observed - date(observed.year, 1, 1)).days // 7,
         "seasonal_week": seasonal_week(observed), "stage": stage, "accuracy": accuracy,
-        "quality": row.get("quality_grade"), "cells": [h3.latlng_to_cell(lat, lon, r) for r in (7, 8)],
+        "quality": row.get("quality_grade"), "lat": lat, "lon": lon,
     }, None
 
 
@@ -169,6 +169,8 @@ ASSETS = {
     "leaflet.js": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js",
     "leaflet.css": "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css",
     "leaflet.LICENSE": "https://unpkg.com/leaflet@1.9.4/LICENSE",
+    "h3-js.js": "https://unpkg.com/h3-js@4.5.0/dist/h3-js.umd.js",
+    "h3-js.LICENSE": "https://unpkg.com/h3-js@4.5.0/LICENSE",
 }
 
 
@@ -179,7 +181,6 @@ def build_map(output: Path, preview: bool = False) -> Path:
     seen = set()
     excluded = Counter()
     records = []
-    cells = {}
     cutoff = date.fromisoformat(manifest["params"]["d2"])
     for page_path in sorted((output / "pages").glob("*.json")):
         for row in json.loads(page_path.read_text())["results"]:
@@ -190,12 +191,9 @@ def build_map(output: Path, preview: bool = False) -> Path:
             if record is None:
                 excluded[reason] += 1
                 continue
-            for cell in record["cells"]:
-                if cell not in cells:
-                    cells[cell] = len(cells)
             records.append([
                 record["id"], record["date"], 0 if record["stage"] == "larva" else 1,
-                record["accuracy"], *[cells[c] for c in record["cells"]],
+                record["accuracy"], record["lat"], record["lon"],
                 record["week"], record["seasonal_week"], record["quality"],
             ])
     if not preview and len(seen) != manifest["downloaded"]:
@@ -210,12 +208,12 @@ def build_map(output: Path, preview: bool = False) -> Path:
         "date_min": min(r[1] for r in records), "date_max": max(r[1] for r in records),
         "years": dict(sorted(Counter(r[1][:4] for r in records).items())),
     }
-    geometries = [[cell, [[round(lat, 6), round(lon, 6)] for lat, lon in h3.cell_to_boundary(cell)]] for cell in cells]
     payload = {
         "source": {key: manifest.get(key) for key in ("started_at", "completed_at", "place", "place_id")},
         "preview": not manifest.get("complete"),
-        "cutoff": cutoff.isoformat(), "stats": stats, "cells": geometries, "observations": records,
-        "columns": ["id", "date", "stage_0_larva_1_pupa", "accuracy_m", "h3_7_index", "h3_8_index", "week", "seasonal_week", "quality_grade"],
+        "cutoff": cutoff.isoformat(), "stats": stats, "observations": records,
+        "resolutions": [{"level": r, "area_km2": h3.average_hexagon_area(r, "km^2")} for r in range(16)],
+        "columns": ["id", "date", "stage_0_larva_1_pupa", "accuracy_m", "lat", "lon", "week", "seasonal_week", "quality_grade"],
     }
     write_json(output / "summary.json", stats)
     assets = output / "assets"

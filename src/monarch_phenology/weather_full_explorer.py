@@ -2,6 +2,7 @@
 
 import argparse
 from collections import Counter, defaultdict
+import csv
 from datetime import date, datetime, timezone
 import gzip
 import json
@@ -10,7 +11,7 @@ import shutil
 import sqlite3
 
 from .daymet_archive import VARIABLES
-from .weather_explorer import METRICS, habitat_group
+from .weather_explorer import METRICS, habitat_group, density_script
 from .weather_pilot import Regions, SEASONS
 from .weather_report import COLORS
 
@@ -76,6 +77,12 @@ def build(source: Path, output: Path) -> Path:
             ORDER BY o.id,d.date'''
         for r in db.execute(daily_sql):
             buckets[r['id']%128][str(r['id'])].append(list(r)[1:])
+        # Derive the new metric from saved daily lows without changing the source archive.
+        for row in rows:
+            metrics=row['windows'].get('7',{})
+            daily=buckets[row['id']%128].get(str(row['id']),[])
+            if 'tmin_extreme' in metrics and len(daily)==7 and all(d[1] is not None and -100<d[1]<70 for d in daily):
+                metrics['tmin_highest']=max(d[1] for d in daily)
     finally:
         db.close()
     folder=output/'full-daily'
@@ -84,8 +91,18 @@ def build(source: Path, output: Path) -> Path:
         compressed_json(folder/f'{number}.json.gz',bucket)
     compressed_json(output/'full-observations.json.gz',rows)
     (output/'full-summary.json').write_text(json.dumps(summary,indent=2))
-    for filename in ('observations.csv.gz','weather-daily.csv.gz'):
-        shutil.copyfile(source/filename,output/('full-'+filename))
+    shutil.copyfile(source/'weather-daily.csv.gz',output/'full-weather-daily.csv.gz')
+    highest={r['id']:r['windows'].get('7',{}).get('tmin_highest') for r in rows}
+    csv_temp=output/'full-observations.csv.tmp'
+    with gzip.open(source/'observations.csv.gz','rt',newline='') as original, gzip.open(csv_temp,'wt',newline='') as target_csv:
+        reader=csv.DictReader(original)
+        field='tmin_highest_7d'
+        writer=csv.DictWriter(target_csv,[*reader.fieldnames,*([field] if field not in reader.fieldnames else [])])
+        writer.writeheader()
+        for record in reader:
+            record[field]=highest[int(record['id'])]
+            writer.writerow(record)
+    csv_temp.replace(output/'full-observations.csv.gz')
     payload={'rows_url':'full-observations.json.gz','daily_url':'full-daily/',
              'daily_fields':['date',*VARIABLES],'summary':summary,'colors':COLORS,
              'metrics':[{'key':k,'label':label,'unit':unit,'definition':definition} for k,label,unit,definition in METRICS]}
@@ -96,7 +113,7 @@ def build(source: Path, output: Path) -> Path:
     template=Path(__file__).with_name('templates')/'weather_explorer.html'
     encoded=json.dumps(payload,separators=(',',':'),allow_nan=False).replace('<','\\u003c')
     temporary=output/'index.tmp'
-    html=template.read_text().replace('__EXPLORER_DATA__',encoded)
+    html=template.read_text().replace('__EXPLORER_DATA__',encoded).replace('__DENSITY_CODE__',density_script())
     html=html.replace('600 observations · seven daily weather variables · annual land cover',
                       f'{len(rows):,} observations · seven-day weather · annual land cover')
     temporary.write_text(html)

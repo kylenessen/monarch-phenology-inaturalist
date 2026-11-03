@@ -83,7 +83,7 @@ def connect(output):
         CREATE TABLE IF NOT EXISTS weather_summaries(key TEXT PRIMARY KEY REFERENCES requests(key), metrics TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS landcover_results(key TEXT PRIMARY KEY REFERENCES requests(key), year INTEGER, code INTEGER, label TEXT, habitat_group TEXT);
     ''')
-    metrics=', '.join(f"json_extract(w.metrics,'$.{m[0]}') AS {m[0]}_7d" for m in METRICS[:20])
+    metrics=', '.join(f"json_extract(w.metrics,'$.{m[0]}') AS {m[0]}_7d" for m in METRICS[:-3])
     db.execute('CREATE VIEW IF NOT EXISTS enriched_observations AS SELECT o.id, o.observed_on, o.stage, o.latitude, o.longitude, o.accuracy_m, o.point_key, '
                "json_extract(o.payload,'$.human_alive_status') AS human_alive_status, "
                'COALESCE(wr.status,o.weather_eligibility) AS weather_status, COALESCE(lr.status,o.landcover_eligibility) AS landcover_status, '

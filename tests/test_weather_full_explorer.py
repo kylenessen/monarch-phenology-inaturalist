@@ -54,11 +54,17 @@ def test_full_lab_keeps_unavailable_records_and_exact_daily_windows(tmp_path, mo
     assert len(result)==4
     assert result[0]['accuracy'] is None
     assert result[0]['habitat_group']=='Developed'
+    assert result[0]['windows']['7']['tmin_highest']==5
     assert result[2]['habitat_group']=='Unavailable'
     assert result[2]['daymet_status']=='outside_available_years'
     assert result[2]['windows']=={}
     assert result[3]['daymet_status']=='request_error'
     assert result[3]['windows']=={}
+    import csv
+    with gzip.open(out/'full-observations.csv.gz','rt') as f:
+        exported=list(csv.DictReader(f))
+    assert exported[0]['tmin_highest_7d']=='5.0'
+    assert exported[3]['tmin_highest_7d']==''
     assert all(r['sampling_weight']==1 and '14' not in r['windows'] and 'daily' not in r for r in result)
     for original in result[:2]:
         with gzip.open(out/'full-daily'/f"{original['id']%128}.json.gz",'rt') as f:

@@ -50,10 +50,15 @@ METRICS = [
     ('snow_median','Median snow water equivalent','kg/m²','Median water stored in snowpack. Numerically equivalent to mm of water.'),
     ('snow_max','Maximum snow water equivalent','kg/m²','Maximum water stored in snowpack.'),
     ('daylength_median','Median day length','hours','Median daylight duration.'),
+    ('tmin_highest','Hottest daily minimum','temp','Highest of the daily minimum temperatures in the preceding window. The warmest daily low, not a daily maximum.'),
     ('latitude','Latitude','°N','Observation latitude.'),
     ('doy','Seasonal day','day','Month and day aligned to leap year 2000, keeping seasons aligned across years.'),
     ('year','Observation year','year','Calendar year of observation.'),
 ]
+
+
+def density_script():
+    return Path(__file__).with_name('templates').joinpath('weather_density.js').read_text()
 
 
 def build(output: Path, preview: bool = False) -> Path:
@@ -76,6 +81,10 @@ def build(output: Path, preview: bool = False) -> Path:
                 row['windows']={str(n):summarize_window(row['daily'],date.fromisoformat(row['date']),n) for n in (7,14)}
                 row.update(daymet_status='temperature_only_cached',temperature_source='Original pilot cache. Expanded request failed.')
         row.update(json.loads(lc.read_text()) if lc.exists() else {'landcover_status':'pending'})
+        for n in (7,14):
+            metrics=summarize_window(row.get('daily',[]),date.fromisoformat(row['date']),n)
+            if 'tmin_highest' in metrics:
+                row.setdefault('windows',{}).setdefault(str(n),{})['tmin_highest']=metrics['tmin_highest']
         row.update(audit['records'].get(str(row['id']),{}))
         row.setdefault('landcover_label','Unavailable')
         row['habitat_group']=habitat_group(row)
@@ -102,7 +111,7 @@ def build(output: Path, preview: bool = False) -> Path:
     for row in rows:
         record={k:row.get(k) for k in fields}
         for window in ('7','14'):
-            for k in [m[0] for m in METRICS[:20]]:
+            for k in [m[0] for m in METRICS[:-3]]:
                 record[f'{k}_{window}d']=row.get('windows',{}).get(window,{}).get(k)
         flat.append(record)
     with (output/'expanded-observations.csv').open('w',newline='') as f:
@@ -119,7 +128,7 @@ def build(output: Path, preview: bool = False) -> Path:
     if target.exists() and not (output/'original-weather-report.html').exists():
         shutil.copyfile(target,output/'original-weather-report.html')
     template=Path(__file__).with_name('templates')/'weather_explorer.html'
-    target.write_text(template.read_text().replace('__EXPLORER_DATA__',encoded))
+    target.write_text(template.read_text().replace('__EXPLORER_DATA__',encoded).replace('__DENSITY_CODE__',density_script()))
     return target
 
 

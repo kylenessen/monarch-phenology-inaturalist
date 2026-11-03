@@ -26,7 +26,7 @@ def summarize_window(daily: list[dict], observed: date, days: int = 14) -> dict:
             valid[key] = vals
     if 'tmin' in valid and 'tmax' in valid and all(r['tmin'] <= r['tmax'] for r in rows):
         low, high = valid['tmin'], valid['tmax']
-        result.update(tmin_extreme=min(low), tmax_extreme=max(high), tmin_median=median(low), tmax_median=median(high), tmin_mean=mean(low), tmax_mean=mean(high), tmean=mean([(a+b)/2 for a,b in zip(low,high)]), dtr_mean=mean([b-a for a,b in zip(low,high)]), freezing_days=sum(v<=0 for v in low), hot_days=sum(v >= (100-32)/1.8 for v in high))
+        result.update(tmin_extreme=min(low), tmin_highest=max(low), tmax_extreme=max(high), tmin_median=median(low), tmax_median=median(high), tmin_mean=mean(low), tmax_mean=mean(high), tmean=mean([(a+b)/2 for a,b in zip(low,high)]), dtr_mean=mean([b-a for a,b in zip(low,high)]), freezing_days=sum(v<=0 for v in low), hot_days=sum(v >= (100-32)/1.8 for v in high))
     for key, prefix in [('prcp','precip'),('vp','vapor'),('srad','radiation'),('swe','snow'),('dayl','daylength')]:
         if key not in valid:
             continue

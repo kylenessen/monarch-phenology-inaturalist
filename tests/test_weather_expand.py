@@ -17,6 +17,7 @@ def test_medians_extremes_and_units_exclude_observation_date():
     assert metrics['tmin_median']==6.5
     assert metrics['tmax_median']==26.5
     assert metrics['tmin_extreme']==0
+    assert metrics['tmin_highest']==13
     assert metrics['tmax_extreme']==33
     assert metrics['tmean']==16.5
     assert metrics['dtr_mean']==20
@@ -37,10 +38,12 @@ def test_short_window_and_variable_specific_missingness():
     assert metrics['tmin_median']==6.5
     short=summarize_window(rows,date(2025,6,15),7)
     assert short['tmin_median']==10
+    assert short['tmin_highest']==13
     assert short['complete_variables']==7
     missing=summarize_window(rows[1:],date(2025,6,15))
     assert missing['days_found']==13
     assert 'tmin_median' not in missing
+    assert 'tmin_highest' not in missing
 
 
 def test_nlcd_nodata_is_not_a_land_cover_class():

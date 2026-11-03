@@ -74,7 +74,7 @@ uv run python -m monarch_phenology.weather_report
 uv run python -m http.server 8769 --bind 127.0.0.1 --directory runs/weather-pilot
 ```
 
-The original pilot report is preserved at [the historical weather report](http://127.0.0.1:8769/original-weather-report.html). It includes three histograms, selectable scatterplots, descriptive weighted correlations, region and season filters, life stage filters, Fahrenheit and Celsius, coverage counts, an observation-level CSV, and PNG and PDF figures. The expanded explorer below now occupies the main URL. Running `weather_report` reproduces the original page. Run `weather_explorer` afterward to restore the expanded page. Keep the server running while viewing either report. All chart assets are cached locally.
+The original pilot report is preserved at [the historical weather report](http://127.0.0.1:8769/original-weather-report.html). It includes three histograms, selectable scatterplots, descriptive weighted correlations, region and season filters, life stage filters, Fahrenheit and Celsius, coverage counts, an observation-level CSV, and PNG and PDF figures. The full seven-day weather lab now occupies the main URL. Running `weather_report` reproduces the original page. Run `weather_full_explorer` afterward to restore the full weather lab. Keep the server running while viewing either report. All chart assets are cached locally.
 
 [Daymet V4 R1](https://daymet.ornl.gov/overview) provides daily minimum and maximum temperature estimates at 1 km. The temperature metrics are the lowest daily minimum and highest daily maximum over the exact 14 days before the observation, excluding the observation date. Complete coverage of all 14 dates is required. Daymet omits December 31 in leap years, so windows crossing that missing date are excluded without interpolation. Locations outside the Daymet mask remain unavailable. These are interpolated weather-station estimates, not direct measurements at each observation.
 
@@ -88,9 +88,26 @@ The completed pilot has 595 complete temperature windows and 311 usable AET wind
 
 The optional audit joins existing alive/dead annotations and checks extreme Daymet windows against ERA5-Land through Open-Meteo at about 9 km. It checks windows reaching freezing, 100 degrees Fahrenheit, or a daily temperature range of at least 40 degrees Celsius. The pilot has three records annotated dead, including the coldest pupa record. Of 26 weather windows cross-checked, one has a minimum or maximum differing by at least 10 degrees Celsius. Observation 180392679 has a Daymet minimum of -9.12 degrees Celsius and an ERA5-Land minimum of 12.4 degrees Celsius for the same dates. This is flagged for review. Original values remain unchanged, and the interactive report can exclude known-dead records or large weather disagreements. The screening rule is exploratory, not a validated error cutoff. The remaining 574 temperature windows were not independently cross-checked.
 
-### Expanded weather and land-cover explorer
+### Full weather lab
 
-Open [the expanded explorer](http://127.0.0.1:8769/) for the same fixed 600-observation sample with all seven Daymet variables and year-matched USGS land cover. AET is omitted. The default axes show the median daily minimum and median daily maximum over the preceding 14 days, grouped by developed versus natural cover. These are medians across the daily weather values for each observation, not medians across observations. The observed day is excluded. A seven-day alternative uses the same cached daily data.
+[The weather lab](http://127.0.0.1:8769/) now uses all 113,634 retained observations from the completed seven-day point run. The default habitat comparison shows 55,600 developed and 16,416 natural-cover observations. Another 7,961 agricultural records and 33,657 records without land cover remain available through the habitat filter. Complete weather is available for 97,547 observations. There are 84 incomplete windows, 198 observations with failed weather lookups, 510 outside geographic weather coverage, and 15,295 outside available weather years. Land cover is available for 79,977 observations. These are observation counts, not distinct animals or habitat preference estimates.
+
+```sh
+uv run python -m monarch_phenology.weather_full_explorer
+uv run python -m http.server 8769 --bind 127.0.0.1 --directory runs/weather-pilot
+```
+
+The builder reads `runs/weather-full-7d/observations.sqlite` without modifying it. It requires all lookups to have reached a terminal status and final CSV exports to be current. It publishes the lab at the existing URL and preserves the previous pilot at `pilot-weather-lab.html`. It makes no new weather or land-cover calls. The default output uses the pilot's cached geography and Plotly assets. Rebuilding the historical pilot or report replaces the main page, so run `weather_full_explorer` afterward to restore the full lab.
+
+The full lab uses only D−7 through D−1 and equal observation weights. Counts are the default, with within-group percentages available. All 19,850 records with unknown coordinate uncertainty are retained by default. The unknown-only filter isolates them, and every numeric uncertainty filter excludes them. The pilot ERA5 audit is not presented as an audit of the full run. Missing weather and land cover remain explicitly unavailable.
+
+Every matching observation contributes to charts, summaries, correlations, and filtered exports. The scatterplot uses WebGL, the table displays 100 rows per page, and daily series load from local compressed files when inspected. The initial compressed summary payload is about 14 MiB. Daily data stay out of that initial payload. Full compressed CSV downloads use the completed archive exports. Join their `point_key` fields and the seven-day date window to associate the normalized daily rows with observations. The filtered CSV uses the chosen temperature units. The original 600-point pilot keeps its 14-day summaries and sampling weights.
+
+Validation includes 61 Python tests, archive-to-viewer checks for daily dates and values, and browser checks of full-data filters, unknown uncertainty, percentages, presets, pagination, filtered downloads, and mobile layout.
+
+### Historical expanded pilot explorer
+
+Open [the preserved pilot explorer](http://127.0.0.1:8769/pilot-weather-lab.html) for the same fixed 600-observation sample with all seven Daymet variables and year-matched USGS land cover. AET is omitted. The default axes show the median daily minimum and median daily maximum over the preceding 14 days, grouped by developed versus natural cover. These are medians across the daily weather values for each observation, not medians across observations. The observed day is excluded. A seven-day alternative uses the same cached daily data.
 
 The simple habitat comparison combines all four developed classes, NLCD codes 21 through 24, including developed open space such as lawns and parks. Natural cover combines the recognized forest, shrub, grassland, wetland, water, snow, and barren classes. Pasture/hay and cultivated crops remain Agriculture, not natural cover. Missing categories remain Unavailable. The initial comparison displays 364 developed and 96 natural-cover observations. The habitat filter can include the 40 agricultural and 100 unavailable records, or show any group alone. A prominent two-bar chart shows raw observation counts for developed and natural cover in the current selection. It always uses unweighted counts, independent of weather distribution weighting. Agricultural and unavailable records are reported separately below the chart. These describe mapped observation locations, not habitat availability or preference. Original categories remain available, and the summary and filtered CSV exports include `habitat_group`.
 
@@ -115,9 +132,9 @@ The completed expansion has 594 complete 14-day windows for all seven weather va
 
 Validation includes 54 Python tests and a Chromium browser check of presets, metric choices, cumulative distributions, filtering, empty selections, individual daily charts, CSV download, and a 390-pixel mobile viewport. No browser script errors were observed. Median summaries reduce the influence of individual extremes but do not correct model errors, observer bias, seasonal confounding, or missing land cover.
 
-### Active full seven-day point run
+### Full seven-day point archive
 
-The active full run uses point lookups and retrieves only D−7 through D−1 for each eligible observation. It includes all seven daily Daymet variables, seven-day summaries, exact-year USGS land-cover categories, and the developed/natural/agriculture grouping. It does not invoke the full-year archive command below. The existing 600-observation explorer remains available while the full run progresses.
+The active full run uses point lookups and retrieves only D−7 through D−1 for each eligible observation. It includes all seven daily Daymet variables, seven-day summaries, exact-year USGS land-cover categories, and the developed/natural/agriculture grouping. It does not invoke the full-year archive command below. The run finished on November 2, 2026, with remaining request errors explicitly recorded. The full weather lab is published at the existing explorer URL, and the 600-observation pilot is preserved separately.
 
 ```sh
 uv run python -m monarch_phenology.weather_full --workers 64 --interval 0.015625

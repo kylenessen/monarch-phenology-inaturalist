@@ -31,7 +31,7 @@
 
 <div id="legend" class="legend"></div><p id="metricNote" class="notice"></p>
 <section class="grid"><article class="panel"><div class="heading"><h2 id="scatterTitle">Weather relationships</h2><p id="scatterNote">Each dot is one sampled observation. Click a dot to inspect its daily weather.</p></div><div class="small-tools">
-<div class="control"><label for="scatterMode">Plot layers</label><select id="scatterMode"><option value="density">Density + fine points</option><option value="contour">95% region + fine points</option><option value="both">Density + 95% region + points</option><option value="points">Fine points only</option></select></div>
+<div class="control"><label for="scatterMode">Plot layers</label><select id="scatterMode"><option value="density99">Density + 99% region, no points</option><option value="density">Density + fine points</option><option value="contour">95% region + fine points</option><option value="both">Density + 95% region + points</option><option value="points">Fine points only</option></select></div>
 <div class="control"><label for="pointSize">Point size</label><select id="pointSize"><option value="0.8">Extra fine</option><option value="1.2" selected>Fine</option><option value="2">Small</option><option value="3">Medium</option></select></div>
 <div class="control"><label for="densityDetail">Density detail</label><select id="densityDetail"><option value="80">Smooth</option><option value="128" selected>Fine</option><option value="192">Extra fine</option></select></div>
 </div><div id="scatter" class="plot tall"></div><p id="densityNote" class="note" style="padding:0 18px 16px"></p></article>
@@ -48,7 +48,7 @@
 <p>The simple habitat comparison groups NLCD classes 21, 22, 23, and 24 as Developed. Pasture/hay (81) and cultivated crops (82) are Agriculture. Other recognized classes are Natural cover, including forest, shrub, grassland, wetlands, water, snow, and barren land. Unavailable categories are kept separate. The default comparison includes only Developed and Natural cover. Original categories remain available in filters, inspection, and downloads. This is a land-cover grouping, not evidence of habitat selection.</p>
 <p id="statisticsMethods">Histogram percentages and cumulative distributions normalize each displayed group separately. Box summaries use the selected weighting for their 25th, 50th, and 75th percentiles, with whiskers at the 5th and 95th percentiles. Seasonal lines show medians among observations in each month, pooled across selected years. Months with fewer than three valid observations are omitted. Scatterplot correlations are descriptive Pearson correlations, using the selected weights. No significance tests or causal claims are implied. Daily temperature plots always show the complete fetched 14-day period.</p>
 <p id="auditMethods">The existing extreme-temperature audit checked only 26 observations against ERA5-Land. One showed a large disagreement. The audit flag applies to its original 14-day extrema, not a new audit of every variable. Unannotated does not mean alive. Pupa annotations may include dead or empty chrysalises. Presence-only observations cannot establish absence, breeding limits, or survival thresholds.</p>
-<p>Density and the 95% region pool all selected valid pairs with equal observation weights, even when points are colored by category. The surface uses bilinear binning and Gaussian smoothing with a width of 1.5 grid cells. The detail selector changes the grid resolution. The outline is the approximate highest-density region containing 95% of the smoothed mass and may have separate islands. It is not a confidence interval, a survival threshold, or a region guaranteed to enclose exactly 95% of the original dots. At least 20 valid pairs and variation on both axes are required. Density colors use <a href="https://developers.arcgis.com/javascript/latest/visualization/symbols-color-ramps/esri-color-ramps/" target="_blank" rel="noopener">Esri Blue 10</a>, with intensity relative to the peak of the current selection. Points remain clickable above the density.</p>
+<p>Density and the selected 95% or 99% region pool all selected valid pairs with equal observation weights, even when points are colored by category. The surface uses bilinear binning and Gaussian smoothing with a width of 1.5 grid cells. The detail selector changes the grid resolution. The outline is the approximate highest-density region containing the selected percentage of the smoothed mass and may have separate islands. It is not a confidence interval, a survival threshold, or a region guaranteed to enclose exactly that percentage of the original observations. At least 20 valid pairs and variation on both axes are required. Density colors use <a href="https://developers.arcgis.com/javascript/latest/visualization/symbols-color-ramps/esri-color-ramps/" target="_blank" rel="noopener">Esri Blue 10</a>, with intensity relative to the peak of the current selection. Visible points remain clickable above the density. The density-only 99% view hides them.</p>
 <p id="exportMethods">Summary CSV temperature values are Celsius. Daily CSV units are tmin/tmax in °C, prcp in mm/day, vp in Pa, srad in W/m², swe in kg/m², and dayl in seconds. Filtered CSV values follow the displayed temperature units and selected window. Original service responses, query parameters, and metadata remain cached locally.</p></details>
 <footer id="footer"></footer></main>
 <script src="assets/plotly.min.js"></script><script>
@@ -93,13 +93,13 @@ $('pending').classList.remove('hidden');
 const w=DATA.summary.weather,l=DATA.summary.landcover;
 $('pending').textContent='Full archive loaded. '+(w.ok||0).toLocaleString()+' observations have complete weather, '+(w.incomplete_window||0)+' have incomplete windows, '+(w.request_error||0)+' have failed weather lookups, and '+((w.outside_available_years||0)+(w.outside_daymet_coverage||0)).toLocaleString()+' are outside weather coverage. Land cover is available for '+(l.ok||0).toLocaleString()+'. Missing data remain unavailable.';
 }
-function defaults(){['region','stage','season','landcover','month','lifeStatus','quality'].forEach(id=>$(id).value='all');$('yearMin').value=years[0];$('yearMax').value=years.at(-1);$('accuracy').value=full?'all':'1000';$('x').value=full?'tmin_extreme':'tmin_median';$('y').value=full?'tmin_highest':'tmax_median';$('histMetric').value=full?'tmin_extreme':'tmin_median';$('group').value=full?'none':'habitat_group';$('habitat').value=full?'all':'binary';$('window').value=full?'7':'14';$('units').value='F';$('scale').value=full?'count':'weighted';$('dist').value='hist';$('bins').value='20';$('search').value='';$('scatterMode').value=full?'density':'points';$('pointSize').value='1.2';$('densityDetail').value='128';}
+function defaults(){['region','stage','season','landcover','month','lifeStatus','quality'].forEach(id=>$(id).value='all');$('yearMin').value=years[0];$('yearMax').value=years.at(-1);$('accuracy').value=full?'all':'1000';$('x').value=full?'tmin_extreme':'tmin_median';$('y').value=full?'tmin_highest':'tmax_median';$('histMetric').value=full?'tmin_extreme':'tmin_median';$('group').value=full?'none':'habitat_group';$('habitat').value=full?'all':'binary';$('window').value=full?'7':'14';$('units').value='F';$('scale').value=full?'count':'weighted';$('dist').value='hist';$('bins').value='20';$('search').value='';$('scatterMode').value=full?'density99':'points';$('pointSize').value='1.2';$('densityDetail').value='128';}
 function allObservations(){
 ['region','stage','season','landcover','month','lifeStatus','quality'].forEach(id=>$(id).value='all');
 $('yearMin').value=years[0];$('yearMax').value=years.at(-1);$('accuracy').value=full?'all':'1000';
 $('habitat').value='all';$('group').value='none';$('search').value='';
 }
-function overnightView(){allObservations();$('x').value='tmin_extreme';$('y').value='tmin_highest';$('histMetric').value='tmin_extreme';$('scatterMode').value='density';}
+function overnightView(){allObservations();$('x').value='tmin_extreme';$('y').value='tmin_highest';$('histMetric').value='tmin_extreme';$('scatterMode').value='density99';}
 defaults();
 if(location.hash==='#all')allObservations();
 if(location.hash==='#overnight')overnightView();
@@ -115,7 +115,7 @@ function color(g){const names=groupColors;return ({'All observations':'#214b60',
 function filtered(skipHabitat=false){return DATA.rows.filter(r=>(skipHabitat||$('habitat').value==='all'||($('habitat').value==='binary'?['Developed','Natural cover'].includes(r.habitat_group):r.habitat_group===$('habitat').value))&&($('region').value==='all'||r.region===$('region').value)&&($('stage').value==='all'||r.stage===$('stage').value)&&($('season').value==='all'||r.season===$('season').value)&&r.year>=+$('yearMin').value&&r.year<=+$('yearMax').value&&($('month').value==='all'||r.month===+$('month').value)&&($('accuracy').value==='all'||($('accuracy').value==='unknown'?r.accuracy==null:r.accuracy!=null&&r.accuracy<=+$('accuracy').value))&&($('lifeStatus').value==='all'||($('lifeStatus').value==='notdead'?r.human_alive_status!=='dead':r.human_alive_status==='alive'))&&($('quality').value==='all'||r.temperature_audit_flag!=='large_disagreement')&&($('landcover').value==='all'||($('landcover').value==='available'?r.landcover_status==='ok':$('landcover').value==='missing'?r.landcover_status!=='ok':r.landcover_label===$('landcover').value)));}
 const config={responsive:true,displaylogo:false,showSendToCloud:false,modeBarButtonsToRemove:['sendDataToCloud','lasso2d','select2d'],toImageButtonOptions:{format:'png',scale:2}};
 function layout(extra={}){return Object.assign({paper_bgcolor:'#fffdf7',plot_bgcolor:'#fffdf7',font:{family:'system-ui,sans-serif',size:11,color:'#40574a'},margin:{l:64,r:22,t:25,b:58},showlegend:false,hovermode:'closest',xaxis:{gridcolor:'#e9ede4',zeroline:false,automargin:true},yaxis:{gridcolor:'#e9ede4',zeroline:false,automargin:true}},extra);}
-function draw(id,traces,l){if(!traces.length)l.annotations=[{text:'No valid observations match this selection',xref:'paper',yref:'paper',x:.5,y:.5,showarrow:false}];return Plotly.react(id,traces,l,config);}
+function draw(id,traces,l){if(!traces.length&&!l.annotations)l.annotations=[{text:'No valid observations match this selection',xref:'paper',yref:'paper',x:.5,y:.5,showarrow:false}];return Plotly.react(id,traces,l,config);}
 function correlation(rows,x,y){if(rows.length<3)return null;const w=rows.reduce((s,r)=>s+weight(r),0),mx=rows.reduce((s,r)=>s+weight(r)*value(r,x),0)/w,my=rows.reduce((s,r)=>s+weight(r)*value(r,y),0)/w;let a=0,b=0,c=0;rows.forEach(r=>{const dx=value(r,x)-mx,dy=value(r,y)-my;a+=weight(r)*dx*dy;b+=weight(r)*dx*dx;c+=weight(r)*dy*dy;});return b&&c?a/Math.sqrt(b*c):null;}
 function scatter(rows){
 const x=$('x').value,y=$('y').value,pairs=rows.filter(r=>valid(r,x)&&valid(r,y));
@@ -124,18 +124,20 @@ const corr=correlation(pairs,x,y);
 $('corr').textContent=($('scale').value==='weighted'&&!full?'Weighted':'Unweighted')+' Pearson r '+(corr===null?'unavailable':corr.toFixed(2));
 $('scatterTitle').textContent=meta[y].label+' vs. '+meta[x].label;
 $('metricNote').textContent=meta[x].definition+' '+meta[y].definition;
-const mode=$('scatterMode').value,showDensity=mode==='density'||mode==='both',showContour=mode==='contour'||mode==='both';
+const mode=$('scatterMode').value,showPoints=mode!=='density99',coverage=mode==='density99'?.99:.95,percent=Math.round(coverage*100),showDensity=['density','both','density99'].includes(mode),showContour=['contour','both','density99'].includes(mode);
+$('pointSize').disabled=!showPoints;
+$('scatterNote').textContent=showPoints?'Each dot is one observation with both selected values available. Click a dot to inspect its daily weather.':'All matching observations with both values contribute to the density. Individual points are hidden. Use the observation table to inspect daily weather.';
 $('densityDetail').disabled=mode==='points';
-const density=mode==='points'?null:weatherDensityGrid(pairs.map(r=>[value(r,x),value(r,y)]),+$('densityDetail').value);
+const density=mode==='points'?null:weatherDensityGrid(pairs.map(r=>[value(r,x),value(r,y)]),+$('densityDetail').value,coverage);
 const traces=[];
 if(density&&showDensity)traces.push({type:'heatmap',name:'Observation density',x:density.x,y:density.y,z:density.z,
     zmin:0,zmax:100,zsmooth:'best',colorscale:ESRI_BLUE_10.map((c,i)=>[i/(ESRI_BLUE_10.length-1),c]),
     showscale:true,colorbar:{title:{text:'Relative<br>density'},thickness:10,len:.75,tickvals:[0,50,100],ticktext:['Low','50%','Peak']},hoverinfo:'skip'});
 // Plotly fills the constraint's invalid side. '<' therefore fills density >= the cutoff.
-if(density&&showContour)traces.push({type:'contour',name:'95% density region',x:density.x,y:density.y,z:density.z,
+if(density&&showContour)traces.push({type:'contour',name:percent+'% density region',x:density.x,y:density.y,z:density.z,
     contours:{type:'constraint',operation:'<',value:density.threshold},
     fillcolor:'rgba(59,117,140,0.12)',line:{color:'#244c64',width:2},showscale:false,hoverinfo:'skip'});
-for(const g of groups(pairs)){
+if(showPoints)for(const g of groups(pairs)){
     const rs=pairs.filter(r=>groupName(r)===g);
     traces.push({type:full?'scattergl':'scatter',mode:'markers',name:g,
         x:rs.map(r=>value(r,x)),y:rs.map(r=>value(r,y)),customdata:rs.map(r=>r.id),
@@ -146,9 +148,11 @@ for(const g of groups(pairs)){
 $('densityNote').textContent=mode==='points'?'All valid pairs are drawn as fine points.':density?
     'All '+pairs.length.toLocaleString()+' valid pairs contribute equally to one pooled density surface. '+
     (showDensity?'Esri Blue 10 shows density relative to this selection’s peak. ':'')+
-    (showContour?'The outline encloses approximately 95% of smoothed density, not a confidence interval.':'Select the 95% region option to add its outline.'):
-    'Density and a 95% region need at least 20 valid pairs and variation on both axes. Available points are still shown.';
-draw('scatter',traces,layout({margin:{l:64,r:density&&showDensity?70:22,t:25,b:58},xaxis:{title:{text:label(x)},automargin:true},yaxis:{title:{text:label(y)},automargin:true}}));
+    (showContour?'The outline encloses approximately '+percent+'% of smoothed density, not a confidence interval.':'Select the 95% region option to add its outline.'):
+    'Density and its region need at least 20 valid pairs and variation on both axes. '+(showPoints?'Available points are still shown.':'Points are hidden.');
+const plotLayout=layout({margin:{l:64,r:density&&showDensity?70:22,t:25,b:58},xaxis:{title:{text:label(x)},automargin:true},yaxis:{title:{text:label(y)},automargin:true}});
+if(!density&&!showPoints&&pairs.length){plotLayout.annotations=[{text:'Not enough variation or observations to estimate density',xref:'paper',yref:'paper',x:.5,y:.5,showarrow:false}];}
+draw('scatter',traces,plotLayout);
 }
 function distribution(rows){const k=$('histMetric').value,rs=rows.filter(r=>valid(r,k)),weighted=$('scale').value==='weighted';$('histTitle').textContent=meta[k].label;$('histNote').textContent=$('dist').value==='ecdf'?'Cumulative share within each group. '+(weighted?(full?'Equal observation weights.':'Sampling weighted.'):'Equal observation weights.'):(weighted?'Each group sums to 100% among valid records.':'Bars count observations.');const vals=rs.map(r=>value(r,k));let lo=vals.reduce((a,b)=>Math.min(a,b),Infinity),hi=vals.reduce((a,b)=>Math.max(a,b),-Infinity);if(lo===hi){lo-=.5;hi+=.5;}const n=+$('bins').value,step=(hi-lo)/n;
 const traces=groups(rs).map(g=>{const a=rs.filter(r=>groupName(r)===g).sort((a,b)=>value(a,k)-value(b,k)),total=a.reduce((s,r)=>s+weight(r),0);if($('dist').value==='ecdf'){let sum=0;return {type:'scatter',mode:'lines',name:g,x:a.map(r=>value(r,k)),y:a.map(r=>100*(sum+=weight(r))/total),line:{shape:'hv',color:color(g)},hovertemplate:'%{x:.2f}<br>%{y:.1f}%<extra>'+g+'</extra>'};}const counts=Array(n).fill(0);a.forEach(r=>counts[Math.min(n-1,Math.floor((value(r,k)-lo)/step))]+=weight(r));return {type:'bar',name:g,x:counts.map((_,i)=>lo+(i+.5)*step),y:counts.map(v=>weighted?100*v/total:v),width:step*.95,opacity:.5,marker:{color:color(g)},hovertemplate:'%{x:.2f}<br>%{y:.2f}<extra>'+g+'</extra>'};});draw('hist',traces,layout({barmode:'overlay',xaxis:{title:{text:label(k)},automargin:true},yaxis:{title:{text:$('dist').value==='ecdf'||weighted?'Share within group (%)':'Observations'},rangemode:'tozero',automargin:true}}));

@@ -1,6 +1,7 @@
 // Equal-weight, binned two-dimensional Gaussian density for the selected observations.
-// A 95% highest-density region encloses smoothed mass, not confidence in a mean.
-function weatherDensityGrid(points, size=128) {
+// A highest-density region encloses smoothed mass, not confidence in a mean.
+function weatherDensityGrid(points, size=128, coverage=0.95) {
+    if(!Number.isFinite(coverage)||coverage<=0||coverage>=1)throw Error('Density coverage must be between zero and one');
     const valid=points.filter(p=>Number.isFinite(p[0])&&Number.isFinite(p[1]));
     if(valid.length<20)return null;
     let xmin=Infinity,xmax=-Infinity,ymin=Infinity,ymax=-Infinity;
@@ -32,7 +33,7 @@ function weatherDensityGrid(points, size=128) {
     const ranked=Array.from(smooth).filter(v=>v>0).sort((a,b)=>b-a);
     const total=ranked.reduce((a,b)=>a+b,0),peak=ranked[0];
     let cumulative=0,threshold=0;
-    for(const value of ranked){cumulative+=value;threshold=value;if(cumulative>=0.95*total)break;}
+    for(const value of ranked){cumulative+=value;threshold=value;if(cumulative>=coverage*total)break;}
     const enclosed=ranked.filter(v=>v>=threshold).reduce((a,b)=>a+b,0)/total;
     return {x:xs,y:ys,z:Array.from({length:size},(_,y)=>Array.from(smooth.subarray(y*size,(y+1)*size),v=>100*v/peak)),
         threshold:100*threshold/peak,mass:total,enclosedMass:enclosed,count:valid.length,size,sigmaCells:sigma};

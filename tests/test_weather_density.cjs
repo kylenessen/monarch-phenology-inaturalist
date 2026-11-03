@@ -40,3 +40,11 @@ test('separate clusters can remain separate instead of forcing a single ellipse'
     assert.ok(midpoint<d.threshold);
     assert.ok(d.enclosedMass>=.95);
 });
+
+test('99 percent region uses a lower density cutoff and includes more mass',()=>{
+    const inner=weatherDensityGrid(points,128,.95),outer=weatherDensityGrid(points,128,.99);
+    assert.ok(outer.threshold<inner.threshold);
+    assert.ok(outer.enclosedMass>=.99&&outer.enclosedMass<.995);
+    assert.ok(outer.enclosedMass>inner.enclosedMass);
+    assert.throws(()=>weatherDensityGrid(points,128,1),/coverage/);
+});

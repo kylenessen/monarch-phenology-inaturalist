@@ -31,7 +31,7 @@
 
 <div id="legend" class="legend"></div><p id="metricNote" class="notice"></p>
 <section class="grid"><article class="panel"><div class="heading"><h2 id="scatterTitle">Weather relationships</h2><p id="scatterNote">Each dot is one sampled observation. Click a dot to inspect its daily weather.</p></div><div class="small-tools">
-<div class="control"><label for="scatterMode">Plot layers</label><select id="scatterMode"><option value="density99">Density + 99% region, no points</option><option value="density">Density + fine points</option><option value="contour">95% region + fine points</option><option value="both">Density + 95% region + points</option><option value="points">Fine points only</option></select></div>
+<div class="control"><label for="scatterMode">Plot layers</label><select id="scatterMode"><option value="density99">Binned density, 99% region</option><option value="density">Density + fine points</option><option value="contour">95% region + fine points</option><option value="both">Density + 95% region + points</option><option value="points">Fine points only</option></select></div>
 <div class="control"><label for="pointSize">Point size</label><select id="pointSize"><option value="0.8">Extra fine</option><option value="1.2" selected>Fine</option><option value="2">Small</option><option value="3">Medium</option></select></div>
 <div class="control"><label for="densityDetail">Density detail</label><select id="densityDetail"><option value="80">Smooth</option><option value="128" selected>Fine</option><option value="192">Extra fine</option></select></div>
 </div><div id="scatter" class="plot tall"></div><p id="densityNote" class="note" style="padding:0 18px 16px"></p></article>
@@ -48,7 +48,7 @@
 <p>The simple habitat comparison groups NLCD classes 21, 22, 23, and 24 as Developed. Pasture/hay (81) and cultivated crops (82) are Agriculture. Other recognized classes are Natural cover, including forest, shrub, grassland, wetlands, water, snow, and barren land. Unavailable categories are kept separate. The default comparison includes only Developed and Natural cover. Original categories remain available in filters, inspection, and downloads. This is a land-cover grouping, not evidence of habitat selection.</p>
 <p id="statisticsMethods">Histogram percentages and cumulative distributions normalize each displayed group separately. Box summaries use the selected weighting for their 25th, 50th, and 75th percentiles, with whiskers at the 5th and 95th percentiles. Seasonal lines show medians among observations in each month, pooled across selected years. Months with fewer than three valid observations are omitted. Scatterplot correlations are descriptive Pearson correlations, using the selected weights. No significance tests or causal claims are implied. Daily temperature plots always show the complete fetched 14-day period.</p>
 <p id="auditMethods">The existing extreme-temperature audit checked only 26 observations against ERA5-Land. One showed a large disagreement. The audit flag applies to its original 14-day extrema, not a new audit of every variable. Unannotated does not mean alive. Pupa annotations may include dead or empty chrysalises. Presence-only observations cannot establish absence, breeding limits, or survival thresholds.</p>
-<p>Density and the selected 95% or 99% region pool all selected valid pairs with equal observation weights, even when points are colored by category. The surface uses bilinear binning and Gaussian smoothing with a width of 1.5 grid cells. The detail selector changes the grid resolution. The outline is the approximate highest-density region containing the selected percentage of the smoothed mass and may have separate islands. It is not a confidence interval, a survival threshold, or a region guaranteed to enclose exactly that percentage of the original observations. At least 20 valid pairs and variation on both axes are required. Density colors use <a href="https://developers.arcgis.com/javascript/latest/visualization/symbols-color-ramps/esri-color-ramps/" target="_blank" rel="noopener">Esri Blue 10</a>, with intensity relative to the peak of the current selection. Visible points remain clickable above the density. The density-only 99% view hides them.</p>
+<p>Density and the selected 95% or 99% region pool all selected valid pairs with equal observation weights, even when points are colored by category. The surface uses bilinear binning and Gaussian smoothing with a width of 1.5 grid cells. The detail selector changes the grid resolution. The outline is the approximate highest-density region containing the selected percentage of the smoothed mass and may have separate islands. It is not a confidence interval, a survival threshold, or a region guaranteed to enclose exactly that percentage of the original observations. At least 20 valid pairs and variation on both axes are required. Density colors use <a href="https://developers.arcgis.com/javascript/latest/visualization/symbols-color-ramps/esri-color-ramps/" target="_blank" rel="noopener">Esri Blue 10</a>, with intensity relative to the peak of the current selection. Visible points remain clickable above the density. The density-only 99% view hides points and the outline, masks cells below the 99% region cutoff, and leaves the exterior white. Five equal-width density bands use the five Esri Blue 10 colors without interpolation. Density is still smoothed before display, but the displayed cells and color bands are discrete.</p>
 <p id="exportMethods">Summary CSV temperature values are Celsius. Daily CSV units are tmin/tmax in °C, prcp in mm/day, vp in Pa, srad in W/m², swe in kg/m², and dayl in seconds. Filtered CSV values follow the displayed temperature units and selected window. Original service responses, query parameters, and metadata remain cached locally.</p></details>
 <footer id="footer"></footer></main>
 <script src="assets/plotly.min.js"></script><script>
@@ -124,15 +124,21 @@ const corr=correlation(pairs,x,y);
 $('corr').textContent=($('scale').value==='weighted'&&!full?'Weighted':'Unweighted')+' Pearson r '+(corr===null?'unavailable':corr.toFixed(2));
 $('scatterTitle').textContent=meta[y].label+' vs. '+meta[x].label;
 $('metricNote').textContent=meta[x].definition+' '+meta[y].definition;
-const mode=$('scatterMode').value,showPoints=mode!=='density99',coverage=mode==='density99'?.99:.95,percent=Math.round(coverage*100),showDensity=['density','both','density99'].includes(mode),showContour=['contour','both','density99'].includes(mode);
+const mode=$('scatterMode').value,showPoints=mode!=='density99',coverage=mode==='density99'?.99:.95,percent=Math.round(coverage*100),showDensity=['density','both','density99'].includes(mode),showContour=['contour','both'].includes(mode);
 $('pointSize').disabled=!showPoints;
 $('scatterNote').textContent=showPoints?'Each dot is one observation with both selected values available. Click a dot to inspect its daily weather.':'All matching observations with both values contribute to the density. Individual points are hidden. Use the observation table to inspect daily weather.';
 $('densityDetail').disabled=mode==='points';
 const density=mode==='points'?null:weatherDensityGrid(pairs.map(r=>[value(r,x),value(r,y)]),+$('densityDetail').value,coverage);
 const traces=[];
-if(density&&showDensity)traces.push({type:'heatmap',name:'Observation density',x:density.x,y:density.y,z:density.z,
-    zmin:0,zmax:100,zsmooth:'best',colorscale:ESRI_BLUE_10.map((c,i)=>[i/(ESRI_BLUE_10.length-1),c]),
-    showscale:true,colorbar:{title:{text:'Relative<br>density'},thickness:10,len:.75,tickvals:[0,50,100],ticktext:['Low','50%','Peak']},hoverinfo:'skip'});
+if(density&&showDensity){
+    const clipped=mode==='density99',floor=clipped?density.threshold:0;
+    const bounds=Array.from({length:ESRI_BLUE_10.length+1},(_,i)=>floor+(100-floor)*i/ESRI_BLUE_10.length);
+    const colors=ESRI_BLUE_10.flatMap((c,i)=>[[i/ESRI_BLUE_10.length,c],[(i+1)/ESRI_BLUE_10.length,c]]);
+    traces.push({type:'heatmap',name:'Observation density',x:density.x,y:density.y,
+        z:clipped?density.z.map(row=>row.map(v=>v<density.threshold?null:v)):density.z,
+        zmin:floor,zmax:100,zsmooth:false,connectgaps:false,hoverongaps:false,colorscale:colors,
+        showscale:true,colorbar:{title:{text:'Relative<br>density'},thickness:14,len:.75,tickvals:bounds,ticktext:bounds.map(v=>v.toFixed(v<10?1:0)+'%')},hoverinfo:'skip'});
+}
 // Plotly fills the constraint's invalid side. '<' therefore fills density >= the cutoff.
 if(density&&showContour)traces.push({type:'contour',name:percent+'% density region',x:density.x,y:density.y,z:density.z,
     contours:{type:'constraint',operation:'<',value:density.threshold},
@@ -147,10 +153,10 @@ if(showPoints)for(const g of groups(pairs)){
 }
 $('densityNote').textContent=mode==='points'?'All valid pairs are drawn as fine points.':density?
     'All '+pairs.length.toLocaleString()+' valid pairs contribute equally to one pooled density surface. '+
-    (showDensity?'Esri Blue 10 shows density relative to this selection’s peak. ':'')+
-    (showContour?'The outline encloses approximately '+percent+'% of smoothed density, not a confidence interval.':'Select the 95% region option to add its outline.'):
+    (showDensity?'Five discrete Esri Blue 10 bands show density relative to this selection’s peak. ':'')+
+    (mode==='density99'?'Only the 99% highest-density region is colored. Outside is white, with no outline or points.':showContour?'The outline encloses approximately '+percent+'% of smoothed density, not a confidence interval.':'Select the 95% region option to add its outline.'):
     'Density and its region need at least 20 valid pairs and variation on both axes. '+(showPoints?'Available points are still shown.':'Points are hidden.');
-const plotLayout=layout({margin:{l:64,r:density&&showDensity?70:22,t:25,b:58},xaxis:{title:{text:label(x)},automargin:true},yaxis:{title:{text:label(y)},automargin:true}});
+const plotLayout=layout({plot_bgcolor:mode==='density99'?'#ffffff':'#fffdf7',margin:{l:64,r:density&&showDensity?70:22,t:25,b:58},xaxis:{title:{text:label(x)},automargin:true,showgrid:mode!=='density99'},yaxis:{title:{text:label(y)},automargin:true,showgrid:mode!=='density99'}});
 if(!density&&!showPoints&&pairs.length){plotLayout.annotations=[{text:'Not enough variation or observations to estimate density',xref:'paper',yref:'paper',x:.5,y:.5,showarrow:false}];}
 draw('scatter',traces,plotLayout);
 }

@@ -1,0 +1,28 @@
+import {WeatherLab} from './WeatherLab.jsx'
+
+export const author = 'Codex'
+export const created = '2026-11-14'
+
+# Monarch phenology inside an interactive note
+
+This is a small MDX experiment accompanying the detailed discussion note in Kyle's Notes vault. The question is whether antecedent weather helps describe the differing seasonal patterns of human-labeled monarch larvae and pupae across North America.
+
+The retained atlas has **113,634 observations**. Complete weather is available for **97,547**. Those are totals from the November 2, 2026 snapshot, not a new download. A record contributes to the figure only when the selected variables are available.
+
+<WeatherLab initialStage="all" initialUnits="F" />
+
+## What the controls demonstrate
+
+The stage and unit selectors above are a React component imported by this MDX document. They change the initial state of the real weather plot embedded below them. The existing lab still performs filtering and density estimation. This prototype does not duplicate those calculations or embed the full observation archive into the prose.
+
+The horizontal axis is the lowest daily minimum over D−7 through D−1. The vertical axis is the highest daily minimum over the same window. Both are based on daily lows. To ask about exposure to hot daytime conditions, use the full lab and choose Hottest daily maximum instead.
+
+The five color bands represent density relative to the current selection's peak. The white exterior is outside the estimated 99% highest-density region. These are properties of a smoothed distribution of observations. They do not establish thermal survival limits, and blank space does not document absence.
+
+## What this experiment does and does not establish
+
+MDX compiles a Markdown document with component imports into a small web application. It can support controls owned by the note itself. The ordinary Obsidian note uses an iframe to show this page or the plot directly. Obsidian is not compiling this MDX file, and no new Obsidian plugin is required for this experiment.
+
+The prototype uses a local server for the note and a second local server for the weather lab. It works on the computer running those servers. An iCloud-synced note on a phone does not gain access to this computer's localhost. The detailed vault note includes a static figure for that situation. A portable hosted or packaged runtime remains a separate decision.
+
+[MDX format documentation](https://mdxjs.com/docs/what-is-mdx/) explains component imports and expressions. [Using MDX](https://mdxjs.com/docs/using-mdx/) describes compilation and component props. [Obsidian web embeds](https://obsidian.md/help/Editing+and+formatting/Embed+web+pages) documents the iframe approach used in the vault.

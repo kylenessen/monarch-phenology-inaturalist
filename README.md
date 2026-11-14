@@ -195,6 +195,10 @@ Daymet's [variable definitions](https://daymet.ornl.gov/overview) distinguish ac
 
 Early development. Project structure and data pipeline under construction.
 
+## Interactive research notes
+
+The [MDX note experiment](experiments/mdx-notes/README.md) combines narrative prose with a live weather figure and controls for life stage and temperature units. The weather lab accepts `?embed=plot&stage=pupa&units=C#overnight` for a compact figure that can also be embedded directly in an ordinary Obsidian Markdown note. The experiment includes build and startup instructions. Local servers must be running to use the interactive figures. The accompanying Notes vault discussion retains a static figure for offline reading.
+
 ## License
 
 MIT License - See LICENSE file for details

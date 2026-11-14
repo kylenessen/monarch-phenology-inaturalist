@@ -25,7 +25,7 @@
     <div class="eyebrow">Before the butterfly</div><h1>Early stages.</h1>
     <p class="intro">Human-annotated larvae and pupae.</p>
     <div><label class="field" for="year">Time period</label><select class="select" id="year"><option value="all">All years · seasonal cycle</option></select></div>
-    <div><span class="field" id="stageLabel">Life stage</span><div class="segmented" role="group" aria-labelledby="stageLabel"><button data-stage="both" aria-pressed="true">Both</button><button data-stage="0" aria-pressed="false">Larvae</button><button data-stage="1" aria-pressed="false">Pupae</button></div></div>
+    <div><span class="field" id="stageLabel">Life stage</span><div class="segmented" role="group" aria-labelledby="stageLabel"><button data-stage="both" aria-pressed="true">Both</button><button data-stage="0" aria-pressed="false">Larvae</button><button data-stage="1" aria-pressed="false">Chrysalises</button></div></div>
     <div><label class="field" for="resolution">Hexagon size</label><select class="select" id="resolution"></select></div>
     <div><label class="field" for="accuracy">Location accuracy</label><select class="select" id="accuracy"><option value="standard">≤1 km or unstated</option><option value="precise">≤1 km only</option><option value="all">All public coordinates</option></select></div>
     <p class="subtle precision-note"><span id="gridNote">Choose a broader grid to see continental waves.</span></p>
@@ -163,6 +163,7 @@ $('sourceDescription').textContent=fmt(DATA.stats.downloaded)+' North American m
 const summary=[['Fetched observations',DATA.stats.downloaded],['Eligible public locations',DATA.stats.mapped],['Obscured or private',DATA.stats.excluded.obscured_or_private||0],['Conflicting or disputed stages',DATA.stats.excluded.conflicting_or_disputed_stage||0],['Other excluded records',Object.entries(DATA.stats.excluded).filter(([k])=>!['obscured_or_private','conflicting_or_disputed_stage'].includes(k)).reduce((sum,[,v])=>sum+v,0)],['Reported accuracy worse than 1 km',DATA.stats.accuracy_over_1km],['Unstated accuracy',DATA.stats.unknown_accuracy]];
 summary.forEach(([label,n])=>{const dt=document.createElement('dt'),dd=document.createElement('dd');dt.textContent=label;dd.textContent=fmt(n);$('sourceStats').append(dt,dd);});
 rebuild();$('loading').remove();
+if(new URLSearchParams(location.search).get('autoplay')==='1')play();
 } catch(error){document.getElementById('loading').textContent='The map could not load. Open it with the assets folder alongside index.html. '+error.message;console.error(error);}
 </script>
 </body>

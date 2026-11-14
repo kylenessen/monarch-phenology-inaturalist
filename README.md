@@ -197,7 +197,7 @@ Early development. Project structure and data pipeline under construction.
 
 ## Interactive research notes
 
-The [MDX note experiment](experiments/mdx-notes/README.md) combines narrative prose with a live weather figure and controls for life stage and temperature units. The weather lab accepts `?embed=plot&stage=pupa&units=C#overnight` for a compact figure that can also be embedded directly in an ordinary Obsidian Markdown note. The experiment includes build and startup instructions. Local servers must be running to use the interactive figures. The accompanying Notes vault discussion retains a static figure for offline reading.
+The [interactive MDX note](experiments/mdx-notes/README.md) contains the looping weekly map with adjustable H3 resolution and histograms of each observation's coldest daily minimum and hottest daily maximum over the preceding seven days. The histograms pool all dates independently of the map's animation. The map accepts `?autoplay=1`, and the weather lab accepts `?embed=histograms` for direct use in an Obsidian note. Startup instructions are included. Local servers must be running to use these figures.
 
 ## License
 
